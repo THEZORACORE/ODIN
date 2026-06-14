@@ -20,12 +20,17 @@ hardcoded regex patterns. This catches common injection templates but is evadabl
 by adversarial inputs. An ML-based classifier would be more robust but introduces
 a dependency and latency cost. Documented as "mitigated, not solved" in README.
 
-## 4. FakeLLM does not route through Heimdall's budget tracking
+## 4. Budget tracking wraps every LLM call (Phase 2 — resolved)
 
-LLM calls from the FakeLLM don't call `heimdall.record_llm_call()` because the
-adapter layer is designed to be provider-agnostic and doesn't know about Heimdall.
-In production, the orchestrator should wrap LLM calls to track budget. For Phase 1
-tests, we use wall-clock budget exhaustion instead.
+*Phase 1:* the provider-agnostic adapter didn't know about Heimdall, so token
+budgets relied on wall-clock approximation.
+
+*Phase 2:* the orchestrator now wraps its adapter in `TrackedLLM`
+(`odin/routing/llm_adapter.py`), which forwards `resp.tokens_used` to
+`BudgetState.record_llm_call()` and raises `BudgetExhausted` the moment a token
+or call cap is hit. All agents (planner, executor, critic, renderer, verifier)
+share the tracked adapter, so every reasoning call counts against the budget.
+Known remaining gap: MIMIR's embedding calls are not yet metered.
 
 ## 5. MIMIR uses SQLite FTS5 instead of a dedicated search engine
 
@@ -59,12 +64,19 @@ The spec says "cheap vs frontier" routing. We default to `claude-haiku-4-2025041
 (cheap) and `claude-sonnet-4-20250514` (frontier). These are configurable. The router
 is a thin wrapper; no sophisticated cost/quality heuristics yet.
 
-## 10. Verifier comparison uses LLM for self-consistency judgment
+## 10. Self-consistency uses structured output + semantic similarity (Phase 2 — resolved)
 
-The self-consistency check asks the LLM to re-derive an answer, then asks the LLM
-again to compare the two answers. This means the comparison itself could be wrong.
-A more robust approach would use structured output parsing and semantic similarity.
-Documented as a known limitation.
+*Phase 1:* the check asked the LLM to re-derive an answer, then asked the LLM
+*again* to judge whether the two answers agreed — so the comparison itself could
+be wrong.
+
+*Phase 2:* the re-derivation now returns a structured `{"final_answer": ...}`
+and agreement is decided **deterministically** by `SemanticComparator`
+(`odin/verify/similarity.py`) — token cosine + containment by default, or an
+injected embedding function for true semantic similarity. This removes the
+second fallible LLM judge call (and saves a call per verification). The lexical
+default can still be fooled by near-synonyms; inject embeddings for stronger
+semantics.
 
 ## 11. FREYA is a single-pass renderer
 

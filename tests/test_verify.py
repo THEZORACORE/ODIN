@@ -10,10 +10,8 @@ from odin.verify.verifier import Verifier, aggregate_verdicts
 class TestSelfConsistency:
     @pytest.mark.asyncio
     async def test_pass_when_answers_agree(self) -> None:
-        llm = FakeLLM(responses=[
-            "The answer is 42.",  # Re-derived answer
-            '{"agrees": true, "explanation": "Both answers are 42"}',  # Comparison
-        ])
+        # One structured re-derivation call; agreement decided by similarity, no judge call.
+        llm = FakeLLM(responses=['{"final_answer": "42"}'])
         v = Verifier(llm)
         result = await v.self_consistency("n1", "What is 6*7?", "The answer is 42.")
         assert result.outcome == VerifyOutcome.PASS
@@ -21,13 +19,18 @@ class TestSelfConsistency:
 
     @pytest.mark.asyncio
     async def test_fail_when_answers_disagree(self) -> None:
-        llm = FakeLLM(responses=[
-            "The answer is 43.",
-            '{"agrees": false, "explanation": "Answers differ: 42 vs 43"}',
-        ])
+        llm = FakeLLM(responses=['{"final_answer": "43"}'])
         v = Verifier(llm)
         result = await v.self_consistency("n1", "What is 6*7?", "The answer is 42.")
         assert result.outcome == VerifyOutcome.FAIL
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_raw_text_when_not_json(self) -> None:
+        # No JSON: raw content is used as the re-derived answer.
+        llm = FakeLLM(responses=["Paris"])
+        v = Verifier(llm)
+        result = await v.self_consistency("n1", "Capital of France?", "The capital is Paris")
+        assert result.outcome == VerifyOutcome.PASS
 
 
 class TestCritic:
@@ -107,8 +110,7 @@ class TestVerifyAll:
     @pytest.mark.asyncio
     async def test_verify_all_without_code(self) -> None:
         llm = FakeLLM(responses=[
-            "42",  # self-consistency re-derive
-            '{"agrees": true, "explanation": "match"}',  # comparison
+            '{"final_answer": "42"}',  # self-consistency re-derive (structured)
             '{"has_issues": false, "issues": [], "recommendation": "approve"}',  # critic
         ])
         v = Verifier(llm)
@@ -118,8 +120,7 @@ class TestVerifyAll:
     @pytest.mark.asyncio
     async def test_verify_all_with_code(self) -> None:
         llm = FakeLLM(responses=[
-            "42",
-            '{"agrees": true, "explanation": "match"}',
+            '{"final_answer": "42"}',
             '{"has_issues": false, "issues": [], "recommendation": "approve"}',
         ])
         v = Verifier(llm)

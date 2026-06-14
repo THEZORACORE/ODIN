@@ -73,16 +73,23 @@ enforced budget, and a verdict trail.
 
 > Goal: make Phase 1 production-trustworthy. These map 1:1 to the documented Phase 1 limitations.
 
-- [ ] **2.1 Structured verification** (highest value): replace "LLM judges LLM" self-consistency
+- [x] **2.1 Structured verification** (highest value): replace "LLM judges LLM" self-consistency
   with structured output + semantic similarity, so the comparison can't silently be wrong.
-- [ ] **2.2 Budget through LLM calls** (not just tools): wrap every adapter call in
+  *Done:* `odin/verify/similarity.py` `SemanticComparator`; `Verifier.self_consistency` re-derives a
+  structured `final_answer` and decides agreement deterministically (no judge call).
+- [x] **2.2 Budget through LLM calls** (not just tools): wrap every adapter call in
   `record_llm_call()` → real token/cost caps instead of wall-clock approximation.
+  *Done:* `TrackedLLM` (`odin/routing/llm_adapter.py`) wraps the orchestrator's adapter; all agents
+  share it, so every reasoning call counts and `BudgetExhausted` fires on a cap. (Open: MIMIR embeddings.)
 - [ ] **2.3 Container sandbox** for code execution (replace `preexec_fn` rlimits) → safe parallel exec.
 - [ ] **2.4 DAG parallelism**: execute independent `PlanNode`s concurrently (the DAG already encodes deps).
 - [ ] **2.5 ML-based injection detection** to replace hardcoded regex patterns.
 - [ ] **2.6 Scalable backends**: optional Neo4j semantic graph; pluggable vector DB.
 
 **Exit criteria:** parallel DAG execution, real cost accounting, container isolation, ≥90% test coverage.
+
+> **Status:** 2.1 + 2.2 implemented and tested (109 tests). Remaining: 2.3 container sandbox,
+> 2.4 DAG parallelism, 2.5 ML injection detection, 2.6 scalable backends.
 
 ---
 

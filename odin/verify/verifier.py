@@ -19,13 +19,15 @@ import json
 from odin.routing.llm_adapter import LLMAdapter, LLMMessage
 from odin.schemas import VerdictRecord, VerifyOutcome
 from odin.tools.code_interpreter import execute_python
+from odin.verify.similarity import SemanticComparator
 
 
 class Verifier:
     """Multi-strategy verification engine."""
 
-    def __init__(self, llm: LLMAdapter) -> None:
+    def __init__(self, llm: LLMAdapter, *, comparator: SemanticComparator | None = None) -> None:
         self._llm = llm
+        self._comparator = comparator or SemanticComparator()
 
     async def verify_all(
         self,
@@ -39,7 +41,7 @@ class Verifier:
         """Run all applicable verification strategies.
 
         Adaptive depth: when skip_self_consistency is True, only the critic
-        pass runs (saves 2 LLM calls per verification).
+        pass runs (saves 1 LLM call per verification).
         """
         verdicts: list[VerdictRecord] = []
 
@@ -62,49 +64,57 @@ class Verifier:
     async def self_consistency(
         self, node_id: str, question: str, answer: str
     ) -> VerdictRecord:
-        """Re-derive the answer independently and compare."""
+        """Re-derive the answer independently, then compare *deterministically*.
+
+        The agreement decision is made by semantic similarity (not a second LLM
+        judge), so the comparison itself can't silently be wrong.
+        """
         prompt = (
-            "You are a careful reasoner. Answer the following question independently. "
-            "Do NOT reference or repeat any prior answer. Think step by step.\n\n"
+            "You are a careful reasoner. Answer the question independently. Do NOT "
+            "reference any prior answer. Think step by step, then respond with a JSON "
+            'object: {"final_answer": "<concise canonical answer>", "reasoning": "..."}.\n\n'
             f"Question: {question}"
         )
-        rederived = await self._llm.complete(
+        resp = await self._llm.complete(
             [LLMMessage(role="user", content=prompt)],
             temperature=0.0,
         )
+        rederived = self._extract_final_answer(resp.content)
 
-        comparison_prompt = (
-            "Compare these two answers to the same question. "
-            'Respond with a JSON object: {"agrees": true/false, "explanation": "..."}.\n\n'
-            f"Question: {question}\n\n"
-            f"Answer A: {answer}\n\n"
-            f"Answer B: {rederived.content}"
+        agrees, score = self._comparator.agrees(answer, rederived)
+        confidence = round(score if agrees else 1.0 - score, 2)
+        explanation = (
+            f"semantic similarity {score:.2f} (threshold {self._comparator.threshold:.2f}) "
+            f"→ {'agree' if agrees else 'disagree'}"
         )
-        comparison = await self._llm.complete(
-            [LLMMessage(role="user", content=comparison_prompt)],
-            temperature=0.0,
-        )
-
-        agrees = True
-        explanation = comparison.content
-        try:
-            parsed_raw = json.loads(comparison.content)
-            if isinstance(parsed_raw, dict):
-                agrees = bool(parsed_raw.get("agrees", False))
-                explanation = parsed_raw.get("explanation", comparison.content)
-            else:
-                agrees = "true" in comparison.content.lower()
-        except (json.JSONDecodeError, TypeError):
-            agrees = "true" in comparison.content.lower()
 
         return VerdictRecord(
             node_id=node_id,
             outcome=VerifyOutcome.PASS if agrees else VerifyOutcome.FAIL,
             method="self_consistency",
-            explanation=str(explanation),
-            evidence=[answer, rederived.content],
-            confidence=0.7 if agrees else 0.3,
+            explanation=explanation,
+            evidence=[answer, rederived],
+            confidence=confidence,
         )
+
+    @staticmethod
+    def _extract_final_answer(content: str) -> str:
+        """Pull a concise answer from a JSON response, falling back to raw text."""
+        cleaned = content.strip()
+        if cleaned.startswith("```"):
+            lines = cleaned.split("\n")
+            cleaned = "\n".join(lines[1:])
+            if cleaned.endswith("```"):
+                cleaned = cleaned[:-3].strip()
+        try:
+            parsed = json.loads(cleaned)
+        except (json.JSONDecodeError, TypeError):
+            return content.strip()
+        if isinstance(parsed, dict):
+            final = parsed.get("final_answer") or parsed.get("answer")
+            if final is not None:
+                return str(final)
+        return content.strip()
 
     async def critic(
         self, node_id: str, question: str, answer: str
