@@ -6,6 +6,7 @@ Wires all components together and runs the orchestration loop.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import uuid
 
@@ -15,6 +16,8 @@ from rich.panel import Panel
 from rich.table import Table
 
 from odin.core.orchestrator import Orchestrator, OrchestratorResult
+from odin.github import FakeBifrost
+from odin.improve.muninn import LLMProposer, LokiDiffReviewer, Muninn
 from odin.memory.mimir import Mimir
 from odin.routing.llm_adapter import (
     AnthropicAdapter,
@@ -23,7 +26,7 @@ from odin.routing.llm_adapter import (
     OpenAIAdapter,
 )
 from odin.safety.heimdall import Heimdall
-from odin.schemas import ActionRisk, BudgetState
+from odin.schemas import ActionRisk, BenchmarkResult, BudgetState, ImprovementProposal
 from odin.tools.code_interpreter import execute_python
 from odin.tools.registry import ToolRegistry, ToolSpec
 from odin.tools.web_search import auto_configure_search, web_search
@@ -196,6 +199,62 @@ def run(
         goal, data_dir, sid, max_tokens, max_llm_calls, max_tool_calls, max_time
     ))
     _display_result(result)
+
+
+class _DemoEvaluator:
+    """Deterministic evaluator for the offline RSIP demo (no real sandbox)."""
+
+    async def baseline(self) -> BenchmarkResult:
+        return BenchmarkResult(suite="vigridr-smoke", total=3, passed=1, avg_tokens=300.0)
+
+    async def candidate(self, proposal: ImprovementProposal) -> BenchmarkResult:
+        return BenchmarkResult(suite="vigridr-smoke", total=3, passed=3, avg_tokens=180.0)
+
+
+async def _run_rsip_demo() -> None:
+    """Run one bounded, verified, human-gated self-improvement cycle, fully offline."""
+    proposal_json = json.dumps(
+        {
+            "target_file": "odin/agents/freya_renderer.py",
+            "rationale": "tighten the answer-rendering prompt to cite sources more reliably",
+            "diff": "+ cite every claim\n- vague summary",
+            "expected_metric": "pass_rate",
+            "expected_metric_delta": 0.66,
+            "risk": "low",
+        }
+    )
+    review_json = json.dumps(
+        {"outcome": "pass", "explanation": "scoped, safe, improves grounding", "confidence": 0.85}
+    )
+    llm = FakeLLM(responses=[proposal_json, review_json])
+
+    muninn = Muninn(
+        heimdall=Heimdall(),
+        proposer=LLMProposer(llm),
+        evaluator=_DemoEvaluator(),
+        reviewer=LokiDiffReviewer(llm),
+        publisher=FakeBifrost(),
+    )
+    outcome = await muninn.run_cycle("FREYA sometimes omits citations")
+
+    verdict = "[green]ACCEPTED[/green]" if outcome.accepted else "[red]REJECTED[/red]"
+    body = f"[bold]Decision:[/bold] {verdict}\n"
+    if outcome.baseline and outcome.candidate:
+        body += (
+            f"[bold]VÍGRÍÐR:[/bold] pass_rate "
+            f"{outcome.baseline.pass_rate:.2f} → {outcome.candidate.pass_rate:.2f}, "
+            f"avg_tokens {outcome.baseline.avg_tokens:.0f} → {outcome.candidate.avg_tokens:.0f}\n"
+        )
+    body += "[bold]Reasons:[/bold]\n" + "\n".join(f"  • {r}" for r in outcome.reasons)
+    if outcome.pr_url:
+        body += f"\n[bold]PR:[/bold] {outcome.pr_url} (awaiting human review)"
+    console.print(Panel(body, title="MUNINN — RSIP cycle (offline demo)", border_style="blue"))
+
+
+@cli.command(name="rsip-demo")
+def rsip_demo() -> None:
+    """Demonstrate the self-improvement loop end-to-end, fully offline (FakeLLM)."""
+    asyncio.run(_run_rsip_demo())
 
 
 @cli.command()

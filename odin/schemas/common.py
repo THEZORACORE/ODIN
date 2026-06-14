@@ -52,6 +52,8 @@ class AgentRole(StrEnum):
     LOKI = "loki"
     MIMIR = "mimir"
     HEIMDALL = "heimdall"
+    MUNINN = "muninn"
+    BIFROST = "bifrost"
 
 
 # ---------------------------------------------------------------------------
@@ -252,3 +254,61 @@ class BudgetState(BaseModel):
 
     def record_tool_call(self) -> None:
         self.tool_calls_used += 1
+
+
+# ---------------------------------------------------------------------------
+# Self-improvement (RSIP — Phase 4)
+# ---------------------------------------------------------------------------
+
+class ImprovementProposal(BaseModel):
+    """A scoped, self-improvement change MUNINN proposes to ODIN's own code/prompts.
+
+    Never applied directly — it is gated by HEIMDALL, proven on the VÍGRÍÐR
+    benchmark, reviewed by LOKI, and shipped as a human-approved PR via BIFRÖST.
+    """
+
+    id: str = Field(default_factory=_uid)
+    target_file: str
+    rationale: str
+    diff: str
+    expected_metric: str = "pass_rate"
+    expected_metric_delta: float = 0.0
+    risk: ActionRisk = ActionRisk.MEDIUM
+    created_at: datetime = Field(default_factory=_now)
+
+    def diff_line_count(self) -> int:
+        """Number of added/removed lines in the unified diff (ignores headers/hunks)."""
+        return sum(
+            1
+            for line in self.diff.splitlines()
+            if (line.startswith(("+", "-")) and not line.startswith(("+++", "---")))
+        )
+
+
+class BenchmarkResult(BaseModel):
+    """Aggregate outcome of running the VÍGRÍÐR proving-ground suite."""
+
+    suite: str
+    total: int
+    passed: int
+    avg_tokens: float = 0.0
+    avg_latency_seconds: float = 0.0
+    details: list[dict[str, Any]] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=_now)
+
+    @property
+    def pass_rate(self) -> float:
+        return self.passed / self.total if self.total else 0.0
+
+
+class ImprovementOutcome(BaseModel):
+    """The verdict of a full MUNINN self-improvement cycle."""
+
+    proposal_id: str
+    accepted: bool
+    reasons: list[str] = Field(default_factory=list)
+    baseline: BenchmarkResult | None = None
+    candidate: BenchmarkResult | None = None
+    review: VerdictRecord | None = None
+    pr_url: str | None = None
+    created_at: datetime = Field(default_factory=_now)
