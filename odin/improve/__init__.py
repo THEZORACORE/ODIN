@@ -10,6 +10,7 @@ from odin.improve.benchmark import (
     SolverOutput,
     make_default_suite,
 )
+from odin.improve.evaluator import SandboxEvaluator, parse_pytest_summary
 from odin.improve.muninn import (
     DiffReviewer,
     Evaluator,
@@ -19,18 +20,35 @@ from odin.improve.muninn import (
     Proposer,
     Publisher,
 )
+from odin.improve.rollback import Rollback
+from odin.improve.sandbox import GitWorktreeSandbox
+from odin.improve.shell import CommandRunner, SubprocessRunner
+from odin.improve.telemetry import (
+    ImprovementTrigger,
+    TelemetryEvent,
+    TelemetrySink,
+)
 
 __all__ = [
     "BenchmarkSuite",
     "BenchmarkTask",
+    "CommandRunner",
     "DiffReviewer",
     "Evaluator",
+    "GitWorktreeSandbox",
+    "ImprovementTrigger",
     "LLMProposer",
     "LokiDiffReviewer",
     "Muninn",
     "Proposer",
     "Publisher",
+    "Rollback",
+    "SandboxEvaluator",
     "Solver",
     "SolverOutput",
+    "SubprocessRunner",
+    "TelemetryEvent",
+    "TelemetrySink",
     "make_default_suite",
+    "parse_pytest_summary",
 ]

@@ -56,7 +56,10 @@ odin run "research Python async patterns, compute timing benchmarks, summarize w
 
 odin memories          # view stored memories
 odin rsip-demo         # watch one self-improvement (RSIP) cycle, fully offline
-pytest tests/ -v       # run the test suite (109 tests)
+odin rsip-triggers     # show telemetry-derived improvement triggers (offline)
+odin rsip "<weakness>" # LIVE cycle: sandbox-test a candidate + open a real PR
+odin rollback          # safely revert the last self-improvement commit
+pytest tests/ -v       # run the test suite (126 tests)
 ```
 
 See [`odin/README.md`](odin/README.md) for the Phase 1 component docs and
@@ -65,14 +68,15 @@ See [`odin/README.md`](odin/README.md) for the Phase 1 component docs and
 ## Status
 
 - **Phase 1 — done:** single reliable agent with persistence (in [`odin/`](odin/), CI green).
-- **Phase 4 (RSIP) core — done:** the **MUNINN** self-improvement engine ([`odin/improve/`](odin/improve/)),
+- **Phase 4 (RSIP) — done:** the **MUNINN** self-improvement engine ([`odin/improve/`](odin/improve/)),
   the **VÍGRÍÐR** benchmark, **BIFRÖST** PR publisher ([`odin/github/`](odin/github/)), and **HEIMDALL**
-  self-modification caps (protected paths, diff-size cap, kill-switch). Bounded, verified, human-gated —
-  MUNINN opens a PR, a human merges. Try `odin rsip-demo`.
+  self-modification caps (protected paths, diff-size cap, kill-switch). Now also telemetry-driven
+  improvement triggers, sandboxed git-worktree isolation for candidate testing, and one-command
+  rollback. Bounded, verified, human-gated — MUNINN opens a PR, a human merges.
 - **Phase 2 hardening — done:** structured self-consistency (deterministic semantic similarity, no LLM
   judge call) and budget-through-LLM (`TrackedLLM` meters every reasoning call).
-- **Next:** RSIP telemetry triggers, sandbox worktree, and one-command rollback.
-- 109 tests, `ruff` + `mypy` clean.
+- **Next:** Phase 2.3–2.6 (container sandbox, DAG parallelism), Phase 3 (skills), Phase 5 (autonomy).
+- 126 tests, `ruff` + `mypy` clean.
 
 See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full step-by-step build, including the
 self-improvement subsystem and the GitHub integration design.

@@ -122,31 +122,38 @@ MUNINN observes a weakness  →  proposes a change (ImprovementProposal)
         →  BIFRÖST opens a PR  →  HUMAN approves merge
 ```
 
-- [ ] **4.1 Improvement triggers**: detect weaknesses from telemetry — repeated failures on a task
+- [x] **4.1 Improvement triggers**: detect weaknesses from telemetry — repeated failures on a task
   family, low verifier confidence, high cost, slow nodes, recurring error signatures.
+  *Done:* `TelemetrySink` (`odin/improve/telemetry.py`) ingests run signals and `derive_triggers`
+  ranks them into `ImprovementTrigger` weaknesses fed straight into `Muninn.run_cycle` (`odin rsip-triggers`).
 - [x] **4.2 `ImprovementProposal` contract**: `{target_file, rationale, diff, expected_metric_delta, risk}` — `odin/schemas` + `ImprovementOutcome`.
 - [x] **4.3 Candidate generation**: a frontier LLM proposes a *minimal, scoped* diff (`LLMProposer`).
   **No rewriting the safety layer (HEIMDALL) without explicit human sign-off** — enforced by 4.7.
 - [x] **4.4 Self-evaluation harness** (the heart of RSIP): **VÍGRÍÐR** (`odin/improve/benchmark.py`) — a fixed
   benchmark suite. A proposal is accepted **only if** it does not regress correctness and improves a
   target metric (pass_rate, or cost at equal quality). *This is what prevents self-degradation.*
-- [ ] **4.5 Isolation**: every candidate runs on its own git branch in a sandboxed worktree;
-  changes never touch the running process or `main`. *(BIFRÖST opens on a fresh branch; full sandbox = TODO.)*
+- [x] **4.5 Isolation**: every candidate runs on its own git branch in a sandboxed worktree;
+  changes never touch the running process or `main`. *Done:* `GitWorktreeSandbox`
+  (`odin/improve/sandbox.py`) checks the base out into a throwaway worktree; `SandboxEvaluator`
+  applies the diff there and runs the test suite as the candidate metric.
 - [x] **4.6 Adversarial gate**: LOKI reviews the diff for correctness/scope-creep (`LokiDiffReviewer`).
 - [x] **4.7 HEIMDALL caps on self-modification**: `SelfModificationPolicy` — protected paths
   (`odin/safety/`, the benchmark, the engine), max-diff-size cap, irreversible-risk block, and a kill-switch.
 - [x] **4.8 BIFRÖST PR**: `Bifrost.open_pr` opens a PR with the proposal + metric deltas + LOKI report.
 - [x] **4.9 Human-in-the-loop merge** (default ON): MUNINN *never merges* — it only opens a PR.
   *Auto-merge stays OFF until the eval harness + rollback are battle-tested.*
-- [ ] **4.10 Rollback**: every self-change is a revertible commit; one command restores the last-good state.
+- [x] **4.10 Rollback**: every self-change is a revertible commit; one command restores the last-good state.
+  *Done:* `Rollback` (`odin/improve/rollback.py`) + `odin rollback` `git revert`s the last `rsip:` commit
+  (non-destructive — history is preserved).
 
 **Exit criteria:** ODIN opens a real PR that measurably improves a benchmark metric, passes CI + LOKI,
 and is merged by a human — fully logged and reversible.
 
-> **Status:** the RSIP core (4.2–4.4, 4.6–4.9) is implemented and fully offline-tested. Run
-> `odin rsip-demo` to watch one bounded, verified, human-gated cycle end-to-end (FakeLLM, no network).
-> Remaining: telemetry triggers (4.1), a real sandbox worktree (4.5), one-command rollback (4.10),
-> and wiring the live `GhBifrost` against this repo.
+> **Status:** Phase 4 (RSIP) is complete. The core (4.2–4.4, 4.6–4.9) plus telemetry triggers (4.1),
+> sandboxed worktree isolation (4.5), and one-command rollback (4.10) are implemented and tested.
+> `odin rsip-demo` runs a bounded, verified, human-gated cycle offline; `odin rsip "<weakness>"` runs
+> the **live** path — sandbox-tests the candidate and opens a real PR via `GhBifrost` (a human merges).
+> `odin rollback` undoes the last self-change; `odin rsip-triggers` shows telemetry-derived weaknesses.
 
 ---
 
