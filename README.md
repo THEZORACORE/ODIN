@@ -27,6 +27,12 @@ the **full build-out** described in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 | **MUNINN**   | Self-improvement (RSIP) — proposes & validates upgrades      |
 | **BIFRÖST**  | GitHub engine — atomic, gated commits & PRs                 |
 
+This is the *core* pantheon. The **full vision** — ~35 subsystems spanning world models
+(YGGDRASIL), temporal/causal reasoning (NORNS), simulation (VÖLVA), formal verification
+(MJÖLNIR), continual learning (IDUNN), multi-agent debate (FORSETI), containment
+(FENRIR/GLEIPNIR), alignment (BALDR), and resilience (RAGNARÖK/EIR) — is catalogued, with
+honest feasibility tiers, in [`docs/PANTHEON.md`](docs/PANTHEON.md).
+
 ## Core loop
 
 ```
