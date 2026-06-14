@@ -16,8 +16,12 @@ from rich.panel import Panel
 from rich.table import Table
 
 from odin.core.orchestrator import Orchestrator, OrchestratorResult
-from odin.github import FakeBifrost
-from odin.improve.muninn import LLMProposer, LokiDiffReviewer, Muninn
+from odin.github import FakeBifrost, GhBifrost
+from odin.github.bifrost import Bifrost
+from odin.improve.evaluator import SandboxEvaluator
+from odin.improve.muninn import Evaluator, LLMProposer, LokiDiffReviewer, Muninn
+from odin.improve.rollback import Rollback
+from odin.improve.telemetry import TelemetrySink
 from odin.memory.mimir import Mimir
 from odin.routing.llm_adapter import (
     AnthropicAdapter,
@@ -255,6 +259,85 @@ async def _run_rsip_demo() -> None:
 def rsip_demo() -> None:
     """Demonstrate the self-improvement loop end-to-end, fully offline (FakeLLM)."""
     asyncio.run(_run_rsip_demo())
+
+
+async def _run_rsip_live(weakness: str, repo: str, repo_dir: str, base: str) -> None:
+    """Run a real RSIP cycle: real LLM, sandbox-tested candidate, BIFRÖST PR."""
+    llm = _build_llm()
+    publisher: Bifrost = GhBifrost(repo=repo, base=base)
+    evaluator: Evaluator = SandboxEvaluator(repo_dir, base=base)
+    muninn = Muninn(
+        heimdall=Heimdall(),
+        proposer=LLMProposer(llm),
+        evaluator=evaluator,
+        reviewer=LokiDiffReviewer(llm),
+        publisher=publisher,
+    )
+    console.print(f"[dim]Running live RSIP cycle against {repo} (base {base})…[/dim]")
+    outcome = await muninn.run_cycle(weakness)
+    verdict = "[green]ACCEPTED[/green]" if outcome.accepted else "[red]REJECTED[/red]"
+    body = f"[bold]Decision:[/bold] {verdict}\n"
+    body += "[bold]Reasons:[/bold]\n" + "\n".join(f"  \u2022 {r}" for r in outcome.reasons)
+    if outcome.pr_url:
+        body += f"\n[bold]PR:[/bold] {outcome.pr_url} (awaiting human review)"
+    console.print(Panel(body, title="MUNINN — live RSIP cycle", border_style="blue"))
+
+
+@cli.command(name="rsip")
+@click.argument("weakness")
+@click.option("--repo", default="THEZORACORE/ODIN", help="owner/repo BIFRÖST opens the PR against")
+@click.option("--repo-dir", default=".", help="local git checkout to sandbox-test in")
+@click.option("--base", default="main", help="base branch / revision")
+def rsip(weakness: str, repo: str, repo_dir: str, base: str) -> None:
+    """Run a LIVE self-improvement cycle: tests the candidate in an isolated git
+    worktree and opens a real PR via BIFRÖST (a human still merges).
+    """
+    asyncio.run(_run_rsip_live(weakness, repo, repo_dir, base))
+
+
+@cli.command(name="rollback")
+@click.option("--commit", default=None, help="commit SHA to revert (default: last RSIP commit)")
+@click.option("--repo-dir", default=".", help="local git checkout")
+def rollback(commit: str | None, repo_dir: str) -> None:
+    """Safely undo a self-improvement: `git revert` the last RSIP commit (or --commit)."""
+
+    async def _go() -> None:
+        rb = Rollback(repo_dir)
+        if commit is not None:
+            await rb.revert(commit)
+            console.print(f"[green]Reverted[/green] {commit}")
+            return
+        reverted = await rb.revert_last_rsip()
+        if reverted is None:
+            console.print("[yellow]No RSIP commit found to roll back.[/yellow]")
+        else:
+            console.print(f"[green]Reverted last RSIP commit[/green] {reverted}")
+
+    asyncio.run(_go())
+
+
+@cli.command(name="rsip-triggers")
+def rsip_triggers() -> None:
+    """Demonstrate telemetry-driven improvement triggers (Phase 4.1), offline."""
+    sink = TelemetrySink()
+    # Simulate signals an orchestration run might emit.
+    sink.record("verdict_fail", detail="self_consistency", weight=1.0)
+    sink.record("verdict_fail", detail="self_consistency", weight=1.0)
+    sink.record("low_confidence", detail="critic", weight=0.5)
+    sink.record("budget_exhausted", detail="run exhausted its budget", weight=2.0)
+    triggers = sink.derive_triggers(min_score=1.0)
+
+    table = Table(title="MUNINN — telemetry-derived improvement triggers")
+    table.add_column("Score", style="cyan")
+    table.add_column("Occurrences")
+    table.add_column("Weakness")
+    for t in triggers:
+        table.add_row(f"{t.score:.1f}", str(t.occurrences), t.weakness)
+    console.print(table)
+    if triggers:
+        console.print(
+            f"[dim]Top trigger would seed: muninn.run_cycle(\"{triggers[0].weakness}\")[/dim]"
+        )
 
 
 @cli.command()
