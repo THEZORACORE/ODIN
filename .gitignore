@@ -17,6 +17,7 @@ env/
 htmlcov/
 
 # Local data / secrets
+.odin_data/
 *.sqlite
 *.db
 .chroma/
