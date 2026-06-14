@@ -1,0 +1,73 @@
+# Architecture Decisions — ODIN Phase 1
+
+Deviations from the spec and rationale.
+
+## 1. ChromaDB initialization uses `Client` not `PersistentClient`
+
+The spec implies a persistent ChromaDB instance. ChromaDB 0.5+ changed the API —
+`PersistentClient` was replaced with `Client(Settings(is_persistent=True))`. Using
+the Settings-based approach for compatibility with the installed version.
+
+## 2. No `from __future__ import annotations` guarding on StrEnum
+
+The spec targets Python 3.11+. We use `StrEnum` directly (available since 3.11)
+instead of `(str, Enum)` which ruff flags as deprecated in UP042.
+
+## 3. Injection detection is regex-based, not ML-based
+
+The spec says "prompt-injection defense baked in from day one." Phase 1 uses 10
+hardcoded regex patterns. This catches common injection templates but is evadable
+by adversarial inputs. An ML-based classifier would be more robust but introduces
+a dependency and latency cost. Documented as "mitigated, not solved" in README.
+
+## 4. FakeLLM does not route through Heimdall's budget tracking
+
+LLM calls from the FakeLLM don't call `heimdall.record_llm_call()` because the
+adapter layer is designed to be provider-agnostic and doesn't know about Heimdall.
+In production, the orchestrator should wrap LLM calls to track budget. For Phase 1
+tests, we use wall-clock budget exhaustion instead.
+
+## 5. MIMIR uses SQLite FTS5 instead of a dedicated search engine
+
+FTS5 is built into SQLite and provides reasonable keyword search without adding
+Elasticsearch or similar as a dependency. The hybrid retrieval (FTS5 + Chroma dense)
+gives acceptable recall for Phase 1. A dedicated search backend can be swapped in
+later via the MIMIR interface.
+
+## 6. Semantic graph uses NetworkX with JSON serialization
+
+The spec mentions Neo4j as a future backend. Phase 1 uses NetworkX with
+`node_link_data`/`node_link_graph` JSON serialization. This is adequate for
+single-process use but won't scale to concurrent access or large graphs.
+The `_SemanticGraph` class is an internal abstraction that can be replaced.
+
+## 7. Tool sandbox uses `preexec_fn` resource limits (Linux only)
+
+The code interpreter sandbox uses `resource.setrlimit` in a `preexec_fn`. This
+works on Linux but not Windows. The spec doesn't require Windows support. If needed,
+a container-based sandbox would be the proper Phase 2 approach.
+
+## 8. Skill model is stored but not auto-invoked
+
+The spec describes procedural memory with auto-skill extraction (Phase 3). Phase 1
+defines the `Skill` pydantic model and stores it, but doesn't implement automatic
+skill retrieval or invocation. The interface is there; the logic is deferred.
+
+## 9. Model router defaults to Claude Haiku/Sonnet
+
+The spec says "cheap vs frontier" routing. We default to `claude-haiku-4-20250414`
+(cheap) and `claude-sonnet-4-20250514` (frontier). These are configurable. The router
+is a thin wrapper; no sophisticated cost/quality heuristics yet.
+
+## 10. Verifier comparison uses LLM for self-consistency judgment
+
+The self-consistency check asks the LLM to re-derive an answer, then asks the LLM
+again to compare the two answers. This means the comparison itself could be wrong.
+A more robust approach would use structured output parsing and semantic similarity.
+Documented as a known limitation.
+
+## 11. FREYA is a single-pass renderer
+
+The spec describes FREYA as a presentation agent. Phase 1 implements a single LLM
+call that formats results with citations. No iterative refinement or template system.
+The interface supports adding these in Phase 2.

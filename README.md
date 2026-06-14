@@ -9,9 +9,9 @@ independent strategies, **persists memory** across sessions, and — over later 
 > existing frontier LLMs (Claude, GPT). The intelligence comes from the *loop, the
 > verifier, the memory, and the safety bounds* — not from a bigger model.
 
-A working **Phase 1** already exists in `zora-core/zora-core/odin/` (single reliable agent
-with persistence, 75 passing tests). This repository is the home for the **full build-out**
-described in [`docs/ROADMAP.md`](docs/ROADMAP.md).
+The **Phase 1** implementation (single reliable agent with persistence) now lives here in
+[`odin/`](odin/) — 78 passing tests, `ruff` + `mypy` clean. This repository is the home for
+the **full build-out** described in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## The Pantheon (agents & subsystems)
 
@@ -39,11 +39,30 @@ Goal → ODIN (plan) → THOR (execute via tools) → LOKI (critique)
        MUNINN (reflect → propose improvement → BIFRÖST PR, if enabled)
 ```
 
+## Quick start
+
+```bash
+pip install -e ".[dev]"
+
+# Run (set ANTHROPIC_API_KEY or OPENAI_API_KEY for a real LLM; omit for the offline FakeLLM)
+export ANTHROPIC_API_KEY=your-key-here
+odin run "research Python async patterns, compute timing benchmarks, summarize with sources"
+
+odin memories          # view stored memories
+pytest tests/ -v       # run the test suite (78 tests)
+```
+
+See [`odin/README.md`](odin/README.md) for the Phase 1 component docs and
+[`odin/ARCHITECTURE_DECISIONS.md`](odin/ARCHITECTURE_DECISIONS.md) for documented trade-offs.
+
 ## Status
 
-This repo currently contains the **plan**. See [`docs/ROADMAP.md`](docs/ROADMAP.md)
-for the full step-by-step build, including the self-improvement subsystem and the
-GitHub integration design.
+- **Phase 1 — done:** single reliable agent with persistence (in [`odin/`](odin/), 78 tests, CI green).
+- **Next:** Phase 2 hardening (structured verification, budget-through-LLM) and Phase 4
+  self-improvement (RSIP via MUNINN).
+
+See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full step-by-step build, including the
+self-improvement subsystem and the GitHub integration design.
 
 ## License
 
