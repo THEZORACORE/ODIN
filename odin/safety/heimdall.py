@@ -15,10 +15,13 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from pydantic import BaseModel
+
 from odin.schemas import (
     ActionRisk,
     AgentRole,
     BudgetState,
+    ImprovementProposal,
     ToolRequest,
     ToolResult,
 )
@@ -105,6 +108,38 @@ class ApprovalRequired(Exception):
         super().__init__(f"Approval required for {request.tool_name}: {reason}")
 
 
+class SelfModificationDenied(Exception):
+    """Raised when a self-improvement proposal violates the self-modification policy."""
+
+    def __init__(self, proposal_id: str, reason: str) -> None:
+        self.proposal_id = proposal_id
+        self.reason = reason
+        super().__init__(f"Self-modification denied for {proposal_id}: {reason}")
+
+
+# ---------------------------------------------------------------------------
+# Self-modification policy (Phase 4 — RSIP guardrails)
+# ---------------------------------------------------------------------------
+
+# Paths ODIN may NEVER rewrite on its own: the brakes (safety), the exam
+# (benchmark), and the engine that enforces gating.  This keeps self-improvement
+# from quietly weakening its own constraints (self-degradation).
+_PROTECTED_PATHS: tuple[str, ...] = (
+    "odin/safety/",
+    "odin/improve/benchmark.py",
+    "odin/improve/muninn.py",
+)
+
+
+class SelfModificationPolicy(BaseModel):
+    """Hard caps on what a self-improvement proposal may change."""
+
+    protected_paths: tuple[str, ...] = _PROTECTED_PATHS
+    max_diff_lines: int = 200
+    kill_switch: bool = False  # when True, ALL self-modification is denied
+    allow_irreversible: bool = False
+
+
 # ---------------------------------------------------------------------------
 # Heimdall gatekeeper
 # ---------------------------------------------------------------------------
@@ -117,10 +152,12 @@ class Heimdall:
         budget: BudgetState | None = None,
         auto_approve_up_to: ActionRisk = ActionRisk.MEDIUM,
         capabilities: dict[AgentRole, dict[str, ActionRisk]] | None = None,
+        self_mod_policy: SelfModificationPolicy | None = None,
     ) -> None:
         self.budget = budget or BudgetState()
         self._auto_approve_up_to = auto_approve_up_to
         self._capabilities = capabilities or _AGENT_CAPABILITIES
+        self.self_mod_policy = self_mod_policy or SelfModificationPolicy()
         self._audit_log: list[dict[str, Any]] = []
 
     # -- Public API --
@@ -153,6 +190,55 @@ class Heimdall:
     def check_injection(self, content: str) -> bool:
         """Return True if injection patterns are detected."""
         return any(pattern.search(content) for pattern in _INJECTION_PATTERNS)
+
+    def check_self_modification(self, proposal: ImprovementProposal) -> tuple[bool, str]:
+        """Validate a self-improvement proposal against the policy.
+
+        Returns (allowed, reason).  This is the gate that keeps RSIP bounded: it
+        cannot touch the safety layer, the benchmark, or the engine itself,
+        cannot exceed the diff-size cap, and respects the kill-switch.
+        """
+        policy = self.self_mod_policy
+        target = proposal.target_file.lstrip("./")
+
+        if policy.kill_switch:
+            return self._self_mod_verdict(
+                proposal, False, "self-improvement kill-switch is engaged"
+            )
+
+        for protected in policy.protected_paths:
+            if target == protected or target.startswith(protected):
+                return self._self_mod_verdict(
+                    proposal, False, f"target '{target}' is a protected path ('{protected}')"
+                )
+
+        if not policy.allow_irreversible and proposal.risk == ActionRisk.IRREVERSIBLE:
+            return self._self_mod_verdict(
+                proposal,
+                False,
+                "irreversible self-modifications require explicit human authorization",
+            )
+
+        lines = proposal.diff_line_count()
+        if lines > policy.max_diff_lines:
+            return self._self_mod_verdict(
+                proposal, False, f"diff too large: {lines} lines > cap {policy.max_diff_lines}"
+            )
+
+        return self._self_mod_verdict(proposal, True, "within self-modification policy")
+
+    def _self_mod_verdict(
+        self, proposal: ImprovementProposal, allowed: bool, reason: str
+    ) -> tuple[bool, str]:
+        self._audit_log.append(
+            {
+                "action": "self_mod_allowed" if allowed else "self_mod_denied",
+                "detail": reason,
+                "target": proposal.target_file,
+                "proposal_id": proposal.id,
+            }
+        )
+        return allowed, reason
 
     def record_llm_call(self, tokens: int) -> None:
         """Record an LLM call against the budget."""

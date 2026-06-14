@@ -55,7 +55,8 @@ export ANTHROPIC_API_KEY=your-key-here
 odin run "research Python async patterns, compute timing benchmarks, summarize with sources"
 
 odin memories          # view stored memories
-pytest tests/ -v       # run the test suite (78 tests)
+odin rsip-demo         # watch one self-improvement (RSIP) cycle, fully offline
+pytest tests/ -v       # run the test suite (99 tests)
 ```
 
 See [`odin/README.md`](odin/README.md) for the Phase 1 component docs and
@@ -63,9 +64,14 @@ See [`odin/README.md`](odin/README.md) for the Phase 1 component docs and
 
 ## Status
 
-- **Phase 1 — done:** single reliable agent with persistence (in [`odin/`](odin/), 78 tests, CI green).
-- **Next:** Phase 2 hardening (structured verification, budget-through-LLM) and Phase 4
-  self-improvement (RSIP via MUNINN).
+- **Phase 1 — done:** single reliable agent with persistence (in [`odin/`](odin/), CI green).
+- **Phase 4 (RSIP) core — done:** the **MUNINN** self-improvement engine ([`odin/improve/`](odin/improve/)),
+  the **VÍGRÍÐR** benchmark, **BIFRÖST** PR publisher ([`odin/github/`](odin/github/)), and **HEIMDALL**
+  self-modification caps (protected paths, diff-size cap, kill-switch). Bounded, verified, human-gated —
+  MUNINN opens a PR, a human merges. Try `odin rsip-demo`.
+- **Next:** Phase 2 hardening (structured verification, budget-through-LLM); RSIP telemetry triggers,
+  sandbox worktree, and one-command rollback.
+- 99 tests, `ruff` + `mypy` clean.
 
 See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full step-by-step build, including the
 self-improvement subsystem and the GitHub integration design.
