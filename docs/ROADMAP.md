@@ -1,13 +1,21 @@
 # The Ultimate ODIN Build Plan
 
 A concrete, ordered, step-by-step plan to build ODIN from scaffold to a self-improving,
-GitHub-connected agent system — using only current / near-future technology. No quantum
-computing, no AGI hand-waving. The "self-improvement" is real but **bounded, verified, and
-human-gated**.
+GitHub-connected agent system — and then to push it as close to **AGI-like generality** as
+current and near-future technology allows. The "self-improvement" is real but **bounded,
+verified, and human-gated**.
 
 **Guiding principle:** reliability lives in the *loop, the verifier, the memory, and the
 safety bounds* — not in a bigger model. Build bottom-up so every layer is testable before
 the next depends on it.
+
+**Two halves.** Phases 0–6 build a *reliable, self-improving agent* (the trustworthy core).
+Phases 7–12 are the *AGI-approaching* layer — world models, multi-agent society, formal
+guarantees, continual learning, perception, and a hardened alignment+containment capstone.
+The full subsystem catalog (the complete Norse "pantheon" — ~35 subsystems) lives in
+[`PANTHEON.md`](PANTHEON.md), where every component is tagged with a **feasibility tier**:
+🟢 buildable now · 🟡 near-future research · 🔴 open problem. ODIN is *AGI-like*, **not AGI** —
+the plan is honest about which parts are solved engineering and which are open research.
 
 ---
 
@@ -155,6 +163,104 @@ and is merged by a human — fully logged and reversible.
 
 ---
 
+# Part II — The AGI-approaching layer (Phases 7–12)
+
+> These phases pursue **general intelligence** capabilities. Many items are 🟡 near-future or
+> 🔴 open research — they are framed as honest *targets with guardrails*, not promises. See
+> [`PANTHEON.md`](PANTHEON.md) for each subsystem's myth, rationale, and feasibility tier.
+
+## Phase 7 — World model & causal/temporal reasoning (YGGDRASIL · NORNS · VÖLVA)
+
+> Goal: give ODIN a persistent *model of the world* it can reason over and simulate, instead
+> of reasoning only token-by-token.
+
+- [ ] **7.1 YGGDRASIL world model** 🟡: a typed knowledge graph (entities, relations, state)
+  continuously updated from MIMIR and live research; the shared substrate every agent reads/writes.
+- [ ] **7.2 NORNS temporal/causal reasoning** 🟡: causal attribution over history (Urðr),
+  current-state estimation (Verðandi), and forecasting under uncertainty (Skuld).
+- [ ] **7.3 VÖLVA simulation** 🟡: model-based lookahead — Monte-Carlo "what-if" rollouts over the
+  world model *before* committing an action, with calibrated value estimates.
+- [ ] **7.4** Plan against the simulator: ODIN chooses actions by simulated outcome, not just heuristics.
+
+**Exit criteria:** on a benchmark requiring multi-step consequence reasoning, simulation-based
+planning measurably beats reactive planning, within budget.
+
+---
+
+## Phase 8 — Multi-agent society: debate, consensus & ensembles (FORSETI · VÉ&VILI · RATATOSKR · DRAUPNIR · SLEIPNIR)
+
+> Goal: turn one agent into a *society* whose decorrelated members are more reliable than any single one.
+
+- [ ] **8.1 RATATOSKR message bus** 🟢: durable pub/sub for typed inter-agent messages.
+- [ ] **8.2 VÉ & VILI ensembles** 🟢: N independent reasoners across model families; aggregate to cancel decorrelated errors.
+- [ ] **8.3 FORSETI debate & consensus** 🟡: structured multi-agent debate with a judge that explains its ruling.
+- [ ] **8.4 DRAUPNIR self-replication** 🟢: spawn scoped sub-agents on demand; reclaim them; hard lifecycle/budget caps.
+- [ ] **8.5 SLEIPNIR parallelism** 🟢: concurrent sub-DAG execution + speculative decoding + difficulty-routed compute.
+
+**Exit criteria:** debate/ensemble configuration beats single-agent accuracy on a held-out suite
+without exceeding the cost ceiling.
+
+---
+
+## Phase 9 — Formal guarantees & truth (MJÖLNIR · TÝR · GUNGNIR)
+
+> Goal: move critical paths from "probably right" to "provably within spec."
+
+- [ ] **9.1 GUNGNIR structured action** 🟢: grammar/schema-constrained decoding so tool calls are well-formed by construction.
+- [ ] **9.2 MJÖLNIR verification** 🟡: property-based testing + type/contract checks + (where feasible) SMT/formal methods on safety-critical code and plans.
+- [ ] **9.3 TÝR contracts** 🟢: machine-checkable pre/post-conditions and SLAs on tools, agents, and self-improvement proposals.
+- [ ] **9.4** Wire MJÖLNIR/TÝR into the verifier and into the Phase 4 self-improvement gate.
+
+**Exit criteria:** critical tool/plan invariants are enforced by checks, not by hope; violations block the action.
+
+---
+
+## Phase 10 — Continual learning & curiosity (IDUNN · GERI&FREKI · AUDHUMLA · KVASIR)
+
+> Goal: ODIN keeps getting better *without full retrains* — the hardest, most valuable frontier.
+
+- [ ] **10.1 AUDHUMLA data pipeline** 🟢: deduplicated, provenance-tagged, quality-filtered ingestion of experience and fresh knowledge.
+- [ ] **10.2 IDUNN continual updates** 🟡: parameter-efficient adapters (LoRA) on curated data + retrieval-first freshness; guard against catastrophic forgetting.
+- [ ] **10.3 GERI & FREKI active learning** 🟡: seek the data/experiences that most reduce uncertainty (curiosity-driven exploration).
+- [ ] **10.4 KVASIR distillation** 🟢: distill frontier-model behavior into cheaper specialist models for hot paths.
+- [ ] **10.5** Note 🔴: *robust* continual learning at scale is an open problem; ship retrieval-first freshness now, treat weight-level continual learning as research.
+
+**Exit criteria:** demonstrable, non-regressing improvement on a task family from continual updates, validated on VÍGRÍÐR.
+
+---
+
+## Phase 11 — Perception, multimodality & social intelligence (HEIMDALL-senses · VEÐRFÖLNIR · JÖRMUNGANDR · FREYA · FRIGG)
+
+> Goal: extend beyond text — see, hear, understand people, and (optionally) act in environments.
+
+- [ ] **11.1 Multimodal perception** 🟢: image/audio/structured-table understanding via provider APIs, feeding YGGDRASIL.
+- [ ] **11.2 VEÐRFÖLNIR scene understanding** 🟡: abstract raw perception into entities/affordances for the world model.
+- [ ] **11.3 FREYA social intelligence** 🟢: intent/affect recognition and tone control — *recognize, never manipulate*.
+- [ ] **11.4 FRIGG privacy** 🟢: PII detection/redaction, data minimization, need-to-know access.
+- [ ] **11.5 JÖRMUNGANDR embodiment** 🔴: actuation in digital (RPA) or physical (robotics) environments — far-future, optional, heavily sandboxed.
+
+**Exit criteria:** ODIN ingests and reasons over at least one non-text modality end-to-end with provenance.
+
+---
+
+## Phase 12 — Alignment, containment & resilience at scale (BALDR · GLEIPNIR · FENRIR · GJALLARHORN · HLIDSKJALF · RAGNARÖK · NIDHOGG · EIR · RUNES)
+
+> Goal: the capstone. As capability grows, safety must grow *faster*. This phase is never "done."
+
+- [ ] **12.1 HLIDSKJALF observability** 🟢: global live view of plans, verdicts, budgets, memory, and self-improvement history.
+- [ ] **12.2 EIR self-repair** 🟢: health checks, circuit breakers, automatic rollback to last-good state.
+- [ ] **12.3 RAGNARÖK disaster-recovery** 🟢: chaos engineering, graceful degradation, and a one-command global **kill-switch**.
+- [ ] **12.4 NIDHOGG continuous adversarial stress** 🟢: always-on fuzzing/red-teaming that finds weakness before attackers do.
+- [ ] **12.5 FENRIR + GLEIPNIR containment** 🟡: powerful capabilities sandboxed behind tamper-evident, self-uneditable guardrails.
+- [ ] **12.6 GJALLARHORN alerting** 🟢: incident escalation + automatic pause on anomaly.
+- [ ] **12.7 BALDR alignment core** 🔴: constitutional values + corrigibility (the system accepts correction/shutdown) — an open research problem, pursued with humility.
+- [ ] **12.8 RUNES interpretability** 🔴: mechanistic introspection into *why* a decision was made — open research; ship chain-of-thought audit + provenance now.
+
+**Exit criteria:** kill-switch and rollback are proven under chaos tests; HEIMDALL/GLEIPNIR/VÍGRÍÐR
+are provably outside the system's own write-scope; every irreversible action has a human gate.
+
+---
+
 ## GitHub Integration (BIFRÖST) — "connect it to my GitHub"
 
 > Goal: ODIN reads from and ships to GitHub safely. This is how the system "connects to your GitHub."
@@ -192,12 +298,25 @@ ODIN runs  →  MUNINN detects weakness  →  proposes diff on a new branch
 5. **Phase 4 RSIP/MUNINN** — build the **benchmark eval harness FIRST**, then candidate generation, then BIFRÖST PR flow, with human-gated merge + rollback.
 6. **Phase 5 autonomy** — durable jobs, daemon, observability.
 7. **Phase 6 multi-modal + calibration.**
+8. **Phase 7 world model** (YGGDRASIL/NORNS/VÖLVA) — simulation-based planning.
+9. **Phase 8 multi-agent society** (debate/ensembles/parallelism).
+10. **Phase 9 formal guarantees** (MJÖLNIR/TÝR/GUNGNIR) — wired into the verifier and the RSIP gate.
+11. **Phase 10 continual learning** (IDUNN/curiosity/distillation) — retrieval-first now, weight-level as research.
+12. **Phase 11 perception + social intelligence** (multimodal, theory-of-mind, privacy).
+13. **Phase 12 alignment + containment capstone** — built *alongside* every phase, hardened last; never "finished."
 
 ## Definition of "done" for ODIN being "the pinnacle"
 
 - Every answer is **grounded, cited, and verified** by an independent critic.
 - **Budgets are hard** (tokens/cost/time/depth) and enforced everywhere.
-- ODIN **remembers and reuses** what it learns across sessions.
+- ODIN **remembers and reuses** what it learns across sessions, and reasons over a **world model** it can simulate.
 - ODIN can **improve its own code** via PRs that *provably* raise a benchmark metric — and every
   such change is reviewed by a human and reversible.
-- The safety layer (HEIMDALL) is the one thing ODIN **cannot silently rewrite**.
+- Reliability comes from a **society of decorrelated agents** + **formal checks**, not a single model.
+- The safety layer (HEIMDALL), the guardrails (GLEIPNIR), and the eval (VÍGRÍÐR) are the things
+  ODIN **cannot silently rewrite** — the brakes and the exam are off-limits to the system itself.
+
+> **Honest caveat.** Even fully built, ODIN is an *AGI-like* orchestration system, not AGI.
+> The gap (robust continual learning, value alignment, interpretability, general causal reasoning)
+> is unsolved research, not a missing library. This plan moves toward it deliberately and safely —
+> it does not claim to close it. See the "What ODIN is NOT" section of [`PANTHEON.md`](PANTHEON.md).
