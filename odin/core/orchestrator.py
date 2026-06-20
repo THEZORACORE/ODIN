@@ -9,6 +9,7 @@ No runaway loops — recursion depth and wall-clock are capped.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 
@@ -84,6 +85,7 @@ class Orchestrator:
         self._session_id = session_id
         self._plan_revisions = 0
         self._skill_store = skill_store
+        self._revision_lock = asyncio.Lock()
 
         if budget:
             self._heimdall.budget = budget
@@ -146,12 +148,18 @@ class Orchestrator:
                     logger.error("Plan deadlocked — no ready nodes")
                     break
 
-                for node in ready:
-                    result = await self._execute_and_verify(
-                        node, plan, all_verdicts, node_results
+                if len(ready) == 1:
+                    await self._execute_and_verify(
+                        ready[0], plan, all_verdicts, node_results
                     )
-                    if not result:
-                        break
+                else:
+                    logger.info("Parallel fan-out: %d independent nodes", len(ready))
+                    await asyncio.gather(*(
+                        self._execute_and_verify(
+                            node, plan, all_verdicts, node_results
+                        )
+                        for node in ready
+                    ))
 
             # --- 6. REFLECT + SKILL EXTRACTION ---
             logger.info("Phase: REFLECT")
@@ -258,17 +266,18 @@ class Orchestrator:
                     node_results[node.id] = node.result
                     logger.warning("Node %s failed after max retries", node.id)
 
-                    # Try plan revision (bounded)
-                    if self._plan_revisions < self.MAX_PLAN_REVISIONS:
-                        error = "; ".join(v.explanation for v in verdicts if v.outcome == VerifyOutcome.FAIL)
-                        try:
-                            plan = await self._planner.revise_plan(plan, node, error)
-                            self._plan_revisions += 1
-                            logger.info("Plan revised after node %s failure (%d/%d)", node.id, self._plan_revisions, self.MAX_PLAN_REVISIONS)
-                        except Exception:
-                            logger.error("Plan revision failed for node %s", node.id)
-                    else:
-                        logger.warning("Max plan revisions reached (%d), not revising", self.MAX_PLAN_REVISIONS)
+                    # Try plan revision (bounded, serialised under lock)
+                    async with self._revision_lock:
+                        if self._plan_revisions < self.MAX_PLAN_REVISIONS:
+                            error = "; ".join(v.explanation for v in verdicts if v.outcome == VerifyOutcome.FAIL)
+                            try:
+                                plan = await self._planner.revise_plan(plan, node, error)
+                                self._plan_revisions += 1
+                                logger.info("Plan revised after node %s failure (%d/%d)", node.id, self._plan_revisions, self.MAX_PLAN_REVISIONS)
+                            except Exception:
+                                logger.error("Plan revision failed for node %s", node.id)
+                        else:
+                            logger.warning("Max plan revisions reached (%d), not revising", self.MAX_PLAN_REVISIONS)
                     return True  # Continue with other nodes
 
                 logger.info("Node %s failed verification, retrying (%d/%d)", node.id, node.retries, node.max_retries)
