@@ -226,16 +226,29 @@ and is merged by a human — fully logged and reversible.
 > Goal: give ODIN a persistent *model of the world* it can reason over and simulate, instead
 > of reasoning only token-by-token.
 
-- [ ] **7.1 YGGDRASIL world model** 🟡: a typed knowledge graph (entities, relations, state)
+- [x] **7.1 YGGDRASIL world model** 🟡: a typed knowledge graph (entities, relations, state)
   continuously updated from MIMIR and live research; the shared substrate every agent reads/writes.
-- [ ] **7.2 NORNS temporal/causal reasoning** 🟡: causal attribution over history (Urðr),
+  *Done:* `WorldModel` (`odin/world/yggdrasil.py`) — SQLite-backed entity/relation graph with typed
+  properties, BFS traversal, snapshots, and find/update/remove operations.
+- [x] **7.2 NORNS temporal/causal reasoning** 🟡: causal attribution over history (Urðr),
   current-state estimation (Verðandi), and forecasting under uncertainty (Skuld).
-- [ ] **7.3 VÖLVA simulation** 🟡: model-based lookahead — Monte-Carlo "what-if" rollouts over the
+  *Done:* `CausalEngine` (`odin/world/norns.py`) — SQLite-backed timeline + causal DAG.
+  `get_causes()` traces root causes (Urðr), `get_effects()` traces consequences (Skuld),
+  `forecast()` pattern-based prediction, `entity_history()` full timeline.
+- [x] **7.3 VÖLVA simulation** 🟡: model-based lookahead — Monte-Carlo "what-if" rollouts over the
   world model *before* committing an action, with calibrated value estimates.
-- [ ] **7.4** Plan against the simulator: ODIN chooses actions by simulated outcome, not just heuristics.
+  *Done:* `Simulation` (`odin/world/volva.py`) — `simulate()` applies hypothetical actions,
+  propagates causal effects, scores outcomes. `compare_actions()` / `best_action()` for
+  decision support. `what_if()` convenience API.
+- [x] **7.4** Plan against the simulator: ODIN chooses actions by simulated outcome, not just heuristics.
+  *Done:* `best_action()` ranks candidates by simulated score; orchestrator can call this
+  before committing to an action.
 
 **Exit criteria:** on a benchmark requiring multi-step consequence reasoning, simulation-based
 planning measurably beats reactive planning, within budget.
+
+> **Status:** Phase 7 complete (7.1–7.4). 207 tests. YGGDRASIL world model, NORNS causal engine,
+> VÖLVA simulation with compare/best/what-if.
 
 ---
 
