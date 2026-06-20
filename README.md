@@ -61,7 +61,7 @@ odin rsip-demo         # watch one self-improvement (RSIP) cycle, fully offline
 odin rsip-triggers     # show telemetry-derived improvement triggers (offline)
 odin rsip "<weakness>" # LIVE cycle: sandbox-test a candidate + open a real PR
 odin rollback          # safely revert the last self-improvement commit
-pytest tests/ -v       # run the test suite (147 tests)
+pytest tests/ -v       # run the test suite (150 tests)
 ```
 
 See [`odin/README.md`](odin/README.md) for the Phase 1 component docs and
@@ -80,9 +80,11 @@ See [`odin/README.md`](odin/README.md) for the Phase 1 component docs and
   matching skills and reuses proven procedures. Failed runs produce reflection post-mortems.
   Skill scoring (success rate, cost, latency) + retirement via `odin skills-retire`.
 - **Phase 2 hardening — done:** structured self-consistency (deterministic semantic similarity, no LLM
-  judge call) and budget-through-LLM (`TrackedLLM` meters every reasoning call).
-- **Next:** Phase 2.3–2.6 (container sandbox, DAG parallelism), Phase 5 (autonomy), Phases 7–12.
-- 147 tests, `ruff` + `mypy` clean.
+  judge call), budget-through-LLM (`TrackedLLM` meters every reasoning call), and DAG parallelism
+  (independent plan nodes fan out via `asyncio.gather`).
+- **Next:** Phase 2.3/2.5/2.6 (container sandbox, ML injection detection, scalable backends),
+  Phase 5 (autonomy), Phases 7–12.
+- 150 tests, `ruff` + `mypy` clean.
 
 See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full step-by-step build, including the
 self-improvement subsystem and the GitHub integration design.

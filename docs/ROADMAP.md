@@ -82,14 +82,17 @@ enforced budget, and a verdict trail.
   *Done:* `TrackedLLM` (`odin/routing/llm_adapter.py`) wraps the orchestrator's adapter; all agents
   share it, so every reasoning call counts and `BudgetExhausted` fires on a cap. (Open: MIMIR embeddings.)
 - [ ] **2.3 Container sandbox** for code execution (replace `preexec_fn` rlimits) → safe parallel exec.
-- [ ] **2.4 DAG parallelism**: execute independent `PlanNode`s concurrently (the DAG already encodes deps).
+- [x] **2.4 DAG parallelism**: execute independent `PlanNode`s concurrently (the DAG already encodes deps).
+  *Done:* the orchestrator scheduling loop fans out all ready (dependency-free) nodes via
+  `asyncio.gather`; plan revision is serialised under an `asyncio.Lock` so concurrent failures
+  don't corrupt the plan.
 - [ ] **2.5 ML-based injection detection** to replace hardcoded regex patterns.
 - [ ] **2.6 Scalable backends**: optional Neo4j semantic graph; pluggable vector DB.
 
 **Exit criteria:** parallel DAG execution, real cost accounting, container isolation, ≥90% test coverage.
 
-> **Status:** 2.1 + 2.2 implemented and tested (109 tests). Remaining: 2.3 container sandbox,
-> 2.4 DAG parallelism, 2.5 ML injection detection, 2.6 scalable backends.
+> **Status:** 2.1, 2.2, and 2.4 implemented and tested (150 tests). Remaining: 2.3 container
+> sandbox, 2.5 ML injection detection, 2.6 scalable backends.
 
 ---
 
