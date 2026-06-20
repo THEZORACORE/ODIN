@@ -188,13 +188,20 @@ and is merged by a human — fully logged and reversible.
   *Done:* `Scheduler` (`odin/jobs/scheduler.py`) — daemon loop pulls highest-priority queued jobs,
   runs them through the orchestrator (shared MIMIR + SkillStore across jobs), marks completion.
   CLI: `odin queue "<goal>"`, `odin daemon`, `odin jobs`, `odin cancel-job <id>`.
-- [ ] **5.4** Live research agents (web/RAG) feeding fresh, cited context into memory.
-- [ ] **5.5** Observability dashboard: plan DAGs, verdicts, budget, self-improvement history.
+- [x] **5.4** Live research agents (web/RAG) feeding fresh, cited context into memory.
+  *Done:* `ResearchAgent` (`odin/agents/research.py`) — HUGINN/MUNINN ravens proactively search
+  the web for a topic, filter by relevance, and store cited findings as semantic memories in MIMIR.
+  CLI: `odin research "<topic>"`. Supports multi-topic sweeps.
+- [x] **5.5** Observability dashboard: plan DAGs, verdicts, budget, self-improvement history.
+  *Done:* `RunHistory` (`odin/observe/history.py`) — SQLite-backed audit trail recording every
+  orchestration run (nodes, verdicts, budget, timing). Wired into the orchestrator automatically.
+  CLI: `odin history` (run trail), `odin stats` (aggregate metrics: success rate, token totals,
+  avg duration, completion rate).
 
 **Exit criteria:** ODIN completes a multi-hour, multi-goal workload unattended, within budget, with full audit trail.
 
-> **Status:** 5.1, 5.2, and 5.3 implemented and tested (172 tests). Remaining: 5.4 live research
-> agents, 5.5 observability dashboard.
+> **Status:** Phase 5 complete (5.1–5.5). 186 tests. Durable jobs, delegation, scheduler/daemon,
+> live research agents, and full observability.
 
 ---
 

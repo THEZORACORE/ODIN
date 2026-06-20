@@ -25,6 +25,7 @@ from odin.improve.telemetry import TelemetrySink
 from odin.jobs.scheduler import Scheduler
 from odin.jobs.store import JobStore
 from odin.memory.mimir import Mimir
+from odin.observe.history import RunHistory
 from odin.routing.llm_adapter import (
     AnthropicAdapter,
     FakeLLM,
@@ -546,6 +547,105 @@ def cancel_job(job_id: str, data_dir: str) -> None:
     else:
         console.print(f"[green]Cancelled[/green] {result.goal[:60]}")
     store.close()
+
+
+# ---------------------------------------------------------------------------
+# Phase 5.4 — live research
+# ---------------------------------------------------------------------------
+
+
+@cli.command()
+@click.argument("topic")
+@click.option("--data-dir", default=".odin_data", help="Persistence directory")
+@click.option("--max-results", default=5, help="Max search results per topic")
+def research(topic: str, data_dir: str, max_results: int) -> None:
+    """Research a topic and store cited findings in MIMIR."""
+    from odin.agents.research import ResearchAgent
+
+    auto_configure_search()
+    from odin.tools.web_search import _adapter
+
+    llm = _build_llm()
+    mimir = Mimir(data_dir=data_dir, llm=llm, use_chroma=False)
+    agent = ResearchAgent(_adapter, mimir)
+
+    async def _run() -> None:
+        brief = await agent.research(topic, max_results=max_results)
+        console.print(Panel(
+            brief.as_text(),
+            title="HUGINN/MUNINN — Research Brief",
+            border_style="blue",
+        ))
+
+    asyncio.run(_run())
+    mimir.save()
+    mimir.close()
+
+
+# ---------------------------------------------------------------------------
+# Phase 5.5 — observability
+# ---------------------------------------------------------------------------
+
+
+@cli.command()
+@click.option("--data-dir", default=".odin_data", help="Persistence directory")
+@click.option("--limit", default=20, help="Max records to show")
+def history(data_dir: str, limit: int) -> None:
+    """Show run history / audit trail."""
+    rh = RunHistory(data_dir=data_dir)
+    records = rh.recent(limit=limit)
+    if not records:
+        console.print("[dim]No runs recorded yet.[/dim]")
+        rh.close()
+        return
+
+    table = Table(title="HLIDSKJALF — Run History")
+    table.add_column("Session", style="cyan", max_width=12)
+    table.add_column("Goal", max_width=35)
+    table.add_column("Status")
+    table.add_column("Nodes", justify="right")
+    table.add_column("Verdicts", justify="right")
+    table.add_column("Tokens", justify="right")
+    table.add_column("Time", justify="right")
+    table.add_column("When")
+
+    for r in records:
+        status = "[green]OK[/green]" if r.success else "[red]FAIL[/red]"
+        nodes = f"{r.nodes_completed}/{r.node_count}"
+        verdicts = f"{r.verdicts_passed}/{r.verdict_count}"
+        table.add_row(
+            r.session_id[:12], r.goal[:35], status,
+            nodes, verdicts, str(r.tokens_used),
+            f"{r.duration_seconds:.1f}s",
+            r.created_at.strftime("%Y-%m-%d %H:%M"),
+        )
+    console.print(table)
+    rh.close()
+
+
+@cli.command()
+@click.option("--data-dir", default=".odin_data", help="Persistence directory")
+def stats(data_dir: str) -> None:
+    """Show aggregate system statistics."""
+    rh = RunHistory(data_dir=data_dir)
+    s = rh.stats()
+    if s.get("total_runs", 0) == 0:
+        console.print("[dim]No runs recorded yet.[/dim]")
+        rh.close()
+        return
+
+    console.print(Panel(
+        f"[bold]Total runs:[/bold]     {s['total_runs']}\n"
+        f"[bold]Success rate:[/bold]   {s['success_rate']:.0%}\n"
+        f"[bold]Total tokens:[/bold]   {s['total_tokens']:,}\n"
+        f"[bold]LLM calls:[/bold]      {s['total_llm_calls']:,}\n"
+        f"[bold]Tool calls:[/bold]     {s['total_tool_calls']:,}\n"
+        f"[bold]Avg duration:[/bold]   {s['avg_duration_seconds']}s\n"
+        f"[bold]Avg completion:[/bold] {s['avg_completion_rate']:.0%}",
+        title="HLIDSKJALF — System Statistics",
+        border_style="blue",
+    ))
+    rh.close()
 
 
 if __name__ == "__main__":

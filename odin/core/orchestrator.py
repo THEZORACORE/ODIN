@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import UTC, datetime
 
 from odin.agents.freya_renderer import FreyaRenderer
@@ -18,6 +19,7 @@ from odin.agents.loki_critic import LokiCritic
 from odin.agents.odin_planner import OdinPlanner
 from odin.agents.thor_executor import ThorExecutor
 from odin.memory.mimir import Mimir
+from odin.observe.history import RunHistory, RunRecord
 from odin.routing.llm_adapter import LLMAdapter, TrackedLLM
 from odin.safety.heimdall import BudgetExhausted, Heimdall
 from odin.schemas import (
@@ -78,6 +80,7 @@ class Orchestrator:
         session_id: str = "default",
         budget: BudgetState | None = None,
         skill_store: SkillStore | None = None,
+        run_history: RunHistory | None = None,
     ) -> None:
         self._tools = tools
         self._heimdall = heimdall
@@ -85,6 +88,7 @@ class Orchestrator:
         self._session_id = session_id
         self._plan_revisions = 0
         self._skill_store = skill_store
+        self._run_history = run_history
         self._revision_lock = asyncio.Lock()
 
         if budget:
@@ -117,6 +121,7 @@ class Orchestrator:
         all_verdicts: list[VerdictRecord] = []
         node_results: dict[str, str] = {}
         plan = PlanDAG(goal=goal)
+        start_time = time.monotonic()
 
         try:
             # --- 1. PLAN (with skill retrieval) ---
@@ -185,7 +190,7 @@ class Orchestrator:
             success = plan.is_complete()
             logger.info("Orchestration complete. success=%s", success)
 
-            return OrchestratorResult(
+            result = OrchestratorResult(
                 goal=goal,
                 answer=answer,
                 plan=plan,
@@ -194,6 +199,8 @@ class Orchestrator:
                 success=success,
                 session_id=self._session_id,
             )
+            self._record_run(result, start_time)
+            return result
 
         except BudgetExhausted as e:
             logger.warning("Budget exhausted: %s", e)
@@ -205,7 +212,7 @@ class Orchestrator:
                 f"[BUDGET EXHAUSTED] Partial results:\n\n{combined}\n\n"
                 f"Budget state: {e.detail}"
             )
-            return OrchestratorResult(
+            result = OrchestratorResult(
                 goal=goal,
                 answer=answer,
                 plan=plan,
@@ -214,6 +221,8 @@ class Orchestrator:
                 success=False,
                 session_id=self._session_id,
             )
+            self._record_run(result, start_time)
+            return result
 
     async def _execute_and_verify(
         self,
@@ -355,6 +364,33 @@ class Orchestrator:
             reflection = build_reflection(plan, verdicts, session_id=self._session_id)
             self._mimir.store(reflection)
             logger.info("Stored reflection memory for failed run")
+
+    def _record_run(self, result: OrchestratorResult, start_time: float) -> None:
+        """Record the run in the observability history (if configured)."""
+        if self._run_history is None:
+            return
+        b = result.budget_state
+        nodes = result.plan.nodes
+        verdicts = result.verdicts
+        record = RunRecord(
+            id=f"run_{result.session_id}_{int(time.monotonic() * 1000)}",
+            session_id=result.session_id,
+            goal=result.goal,
+            success=result.success,
+            node_count=len(nodes),
+            nodes_completed=sum(1 for n in nodes if n.status == NodeStatus.COMPLETED),
+            nodes_failed=sum(1 for n in nodes if n.status == NodeStatus.FAILED),
+            verdict_count=len(verdicts),
+            verdicts_passed=sum(1 for v in verdicts if v.outcome == VerifyOutcome.PASS),
+            verdicts_failed=sum(1 for v in verdicts if v.outcome == VerifyOutcome.FAIL),
+            tokens_used=b.tokens_used,
+            llm_calls_used=b.llm_calls_used,
+            tool_calls_used=b.tool_calls_used,
+            duration_seconds=round(time.monotonic() - start_time, 3),
+            answer_preview=result.answer[:200],
+        )
+        self._run_history.record(record)
+        logger.info("Run recorded in history: %s", record.id)
 
     def _check_budget(self) -> None:
         if self._heimdall.budget.is_exhausted():
