@@ -22,6 +22,8 @@ from odin.improve.evaluator import SandboxEvaluator
 from odin.improve.muninn import Evaluator, LLMProposer, LokiDiffReviewer, Muninn
 from odin.improve.rollback import Rollback
 from odin.improve.telemetry import TelemetrySink
+from odin.jobs.scheduler import Scheduler
+from odin.jobs.store import JobStore
 from odin.memory.mimir import Mimir
 from odin.routing.llm_adapter import (
     AnthropicAdapter,
@@ -31,6 +33,7 @@ from odin.routing.llm_adapter import (
 )
 from odin.safety.heimdall import Heimdall
 from odin.schemas import ActionRisk, BenchmarkResult, BudgetState, ImprovementProposal
+from odin.schemas import Job as JobModel
 from odin.skills.store import SkillStore
 from odin.tools.code_interpreter import execute_python
 from odin.tools.registry import ToolRegistry, ToolSpec
@@ -412,6 +415,136 @@ def skills_retire(skill_id: str, data_dir: str) -> None:
         console.print(f"[yellow]Skill {skill_id} not found.[/yellow]")
     else:
         console.print(f"[green]Retired[/green] {result.name}")
+    store.close()
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 — job queue + daemon
+# ---------------------------------------------------------------------------
+
+
+@cli.command()
+@click.argument("goal")
+@click.option("--data-dir", default=".odin_data", help="Persistence directory")
+@click.option("--priority", default=0, help="Job priority (higher = first)")
+def queue(goal: str, data_dir: str, priority: int) -> None:
+    """Add a goal to the job queue."""
+    store = JobStore(data_dir=data_dir)
+    job = JobModel(goal=goal, priority=priority)
+    store.save(job)
+    console.print(f"[green]Queued[/green] job [cyan]{job.id}[/cyan]: {goal}")
+    store.close()
+
+
+@cli.command()
+@click.option("--data-dir", default=".odin_data", help="Persistence directory")
+@click.option("--max-jobs", default=None, type=int, help="Stop after N jobs (default: until queue empty)")
+@click.option("--max-tokens", default=500_000, help="Max token budget per job")
+@click.option("--max-llm-calls", default=50, help="Max LLM calls per job")
+@click.option("--max-tool-calls", default=100, help="Max tool calls per job")
+def daemon(
+    data_dir: str,
+    max_jobs: int | None,
+    max_tokens: int,
+    max_llm_calls: int,
+    max_tool_calls: int,
+) -> None:
+    """Run ODIN as a daemon, processing queued jobs continuously."""
+    auto_configure_search()
+    llm = _build_llm()
+    default_budget = BudgetState(
+        max_tokens=max_tokens,
+        max_llm_calls=max_llm_calls,
+        max_tool_calls=max_tool_calls,
+    )
+    heimdall = Heimdall(budget=default_budget)
+    tools = _build_tools(heimdall)
+    mimir = Mimir(data_dir=data_dir, llm=llm, use_chroma=True)
+    skill_store = SkillStore(data_dir=data_dir)
+    job_store = JobStore(data_dir=data_dir)
+
+    scheduler = Scheduler(
+        job_store=job_store,
+        llm=llm,
+        tools=tools,
+        mimir=mimir,
+        skill_store=skill_store,
+        default_budget=default_budget,
+    )
+
+    console.print("[bold]ODIN daemon starting...[/bold]")
+    try:
+        results = asyncio.run(scheduler.run_loop(max_jobs=max_jobs))
+        console.print(f"\n[bold]Processed {len(results)} job(s)[/bold]")
+        for r in results:
+            status = "[green]SUCCESS[/green]" if r.success else "[red]FAILED[/red]"
+            console.print(f"  {status}: {r.goal[:60]}")
+    finally:
+        mimir.save()
+        mimir.close()
+        skill_store.close()
+        job_store.close()
+
+
+@cli.command()
+@click.option("--data-dir", default=".odin_data", help="Persistence directory")
+@click.option("--status", "filter_status", default=None, help="Filter by status (queued/running/completed/failed)")
+@click.option("--limit", default=20, help="Max jobs to show")
+def jobs(data_dir: str, filter_status: str | None, limit: int) -> None:
+    """Show job queue and history."""
+    from odin.schemas import JobStatus
+
+    store = JobStore(data_dir=data_dir)
+    if filter_status:
+        items = store.by_status(JobStatus(filter_status))
+    else:
+        items = store.all_jobs(limit=limit)
+
+    if not items:
+        console.print("[dim]No jobs found.[/dim]")
+        store.close()
+        return
+
+    table = Table(title="ODIN — Job Queue")
+    table.add_column("ID", style="cyan", max_width=12)
+    table.add_column("Goal", max_width=40)
+    table.add_column("Status")
+    table.add_column("Priority", justify="right")
+    table.add_column("Created")
+    table.add_column("Result", max_width=30)
+
+    status_style = {
+        "queued": "[yellow]QUEUED[/yellow]",
+        "running": "[blue]RUNNING[/blue]",
+        "completed": "[green]DONE[/green]",
+        "failed": "[red]FAILED[/red]",
+        "cancelled": "[dim]CANCELLED[/dim]",
+        "paused": "[yellow]PAUSED[/yellow]",
+    }
+
+    for j in items:
+        table.add_row(
+            j.id, j.goal[:40],
+            status_style.get(j.status.value, j.status.value),
+            str(j.priority),
+            j.created_at.strftime("%Y-%m-%d %H:%M"),
+            (j.result_summary or "")[:30],
+        )
+    console.print(table)
+    store.close()
+
+
+@cli.command(name="cancel-job")
+@click.argument("job_id")
+@click.option("--data-dir", default=".odin_data", help="Persistence directory")
+def cancel_job(job_id: str, data_dir: str) -> None:
+    """Cancel a queued job."""
+    store = JobStore(data_dir=data_dir)
+    result = store.cancel(job_id)
+    if result is None:
+        console.print(f"[yellow]Job {job_id} not found.[/yellow]")
+    else:
+        console.print(f"[green]Cancelled[/green] {result.goal[:60]}")
     store.close()
 
 

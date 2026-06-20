@@ -324,3 +324,46 @@ class ImprovementOutcome(BaseModel):
     review: VerdictRecord | None = None
     pr_url: str | None = None
     created_at: datetime = Field(default_factory=_now)
+
+
+# ---------------------------------------------------------------------------
+# Jobs (Phase 5 — multi-agent autonomy)
+# ---------------------------------------------------------------------------
+
+class JobStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class Job(BaseModel):
+    """A durable, resumable orchestration job."""
+
+    id: str = Field(default_factory=_uid)
+    goal: str
+    status: JobStatus = JobStatus.QUEUED
+    parent_job_id: str | None = None
+    session_id: str | None = None
+    checkpoint: str | None = None
+    result_summary: str | None = None
+    budget: BudgetState = Field(default_factory=BudgetState)
+    priority: int = 0
+    tags: list[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=_now)
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+
+
+class DelegationRequest(BaseModel):
+    """A sub-goal delegation from one agent/job to another."""
+
+    id: str = Field(default_factory=_uid)
+    parent_job_id: str
+    sub_goal: str
+    delegated_by: AgentRole = AgentRole.ODIN
+    context: str = ""
+    priority: int = 0
+    created_at: datetime = Field(default_factory=_now)
