@@ -97,12 +97,26 @@ enforced budget, and a verdict trail.
 
 > Goal: ODIN gets *better at recurring tasks over time* — the gateway to true self-improvement.
 
-- [ ] **3.1 Skill extraction**: after a successful, verified run, distill the plan+tools into a reusable `Skill`.
-- [ ] **3.2 Skill retrieval & auto-invocation**: match new goals to stored skills; reuse instead of re-deriving.
-- [ ] **3.3 Skill scoring**: track success/cost per skill; prefer high-yield skills; retire bad ones.
-- [ ] **3.4 Reflection memory**: store *why* runs failed, not just that they failed (post-mortems as memory).
+- [x] **3.1 Skill extraction**: after a successful, verified run, distill the plan+tools into a reusable `Skill`.
+  *Done:* `extract_skill` (`odin/skills/extraction.py`) distils a completed `PlanDAG` into a `Skill` with
+  steps, tools, preconditions, and tags. The orchestrator auto-extracts after every successful run.
+- [x] **3.2 Skill retrieval & auto-invocation**: match new goals to stored skills; reuse instead of re-deriving.
+  *Done:* `SkillStore.find` (`odin/skills/store.py`) uses FTS5 keyword search to match a goal to stored
+  skills. The orchestrator retrieves matching skills and injects them as hints into `OdinPlanner.create_plan`
+  so the planner can reuse proven procedures instead of re-deriving.
+- [x] **3.3 Skill scoring**: track success/cost per skill; prefer high-yield skills; retire bad ones.
+  *Done:* `SkillStore.record_outcome` updates success/failure counts, running-average cost and latency;
+  `SkillStore.retire` marks bad skills; `odin skills` and `odin skills-retire` CLI commands.
+- [x] **3.4 Reflection memory**: store *why* runs failed, not just that they failed (post-mortems as memory).
+  *Done:* `build_reflection` (`odin/skills/reflection.py`) produces a `PROCEDURAL` memory record with
+  failed steps, failed verifications, and a synthesised lesson. Stored by the orchestrator on failure.
 
 **Exit criteria:** measurable drop in cost/latency on repeated task families; skills demonstrably reused.
+
+> **Status:** Phase 3 is complete. Skills are automatically extracted from successful runs, stored in
+> a SQLite-backed `SkillStore`, and injected into the planner as hints for future runs. Failed runs
+> produce reflection post-mortems. `odin skills` lists learned skills; `odin skills-retire <id>` retires
+> bad ones. 147 tests, `ruff` + `mypy` clean.
 
 ---
 

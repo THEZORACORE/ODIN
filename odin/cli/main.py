@@ -31,6 +31,7 @@ from odin.routing.llm_adapter import (
 )
 from odin.safety.heimdall import Heimdall
 from odin.schemas import ActionRisk, BenchmarkResult, BudgetState, ImprovementProposal
+from odin.skills.store import SkillStore
 from odin.tools.code_interpreter import execute_python
 from odin.tools.registry import ToolRegistry, ToolSpec
 from odin.tools.web_search import auto_configure_search, web_search
@@ -150,6 +151,7 @@ async def _run_goal(
     heimdall = Heimdall(budget=budget)
     tools = _build_tools(heimdall)
     mimir = Mimir(data_dir=data_dir, llm=llm, use_chroma=True)
+    skill_store = SkillStore(data_dir=data_dir)
 
     orchestrator = Orchestrator(
         llm=llm,
@@ -158,6 +160,7 @@ async def _run_goal(
         mimir=mimir,
         session_id=session_id,
         budget=budget,
+        skill_store=skill_store,
     )
 
     try:
@@ -166,6 +169,7 @@ async def _run_goal(
     finally:
         mimir.save()
         mimir.close()
+        skill_store.close()
 
 
 @click.group()
@@ -364,6 +368,51 @@ def memories(data_dir: str) -> None:
         )
     console.print(table)
     mimir.close()
+
+
+@cli.command(name="skills")
+@click.option("--data-dir", default=".odin_data", help="Persistence directory")
+@click.option("--all", "show_all", is_flag=True, help="Include retired skills")
+def skills_list(data_dir: str, show_all: bool) -> None:
+    """List learned procedural skills."""
+    store = SkillStore(data_dir=data_dir)
+    items = store.all_skills() if show_all else store.all_active()
+    if not items:
+        console.print("[dim]No skills learned yet.[/dim]")
+        store.close()
+        return
+
+    table = Table(title="ODIN — Learned Skills")
+    table.add_column("ID", style="cyan", max_width=12)
+    table.add_column("Name", max_width=40)
+    table.add_column("Success", justify="right")
+    table.add_column("Uses", justify="right")
+    table.add_column("Avg tokens", justify="right")
+    table.add_column("Retired")
+
+    for s in items:
+        table.add_row(
+            s.id, s.name[:40],
+            f"{s.success_rate:.0%}", str(s.usage_count),
+            f"{s.avg_cost_tokens:.0f}",
+            "[red]yes[/red]" if s.retired else "",
+        )
+    console.print(table)
+    store.close()
+
+
+@cli.command(name="skills-retire")
+@click.argument("skill_id")
+@click.option("--data-dir", default=".odin_data", help="Persistence directory")
+def skills_retire(skill_id: str, data_dir: str) -> None:
+    """Retire a skill so it is no longer auto-invoked."""
+    store = SkillStore(data_dir=data_dir)
+    result = store.retire(skill_id)
+    if result is None:
+        console.print(f"[yellow]Skill {skill_id} not found.[/yellow]")
+    else:
+        console.print(f"[green]Retired[/green] {result.name}")
+    store.close()
 
 
 if __name__ == "__main__":

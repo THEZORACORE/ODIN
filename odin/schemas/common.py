@@ -166,16 +166,28 @@ class VerdictRecord(BaseModel):
 # ---------------------------------------------------------------------------
 
 class Skill(BaseModel):
-    """A reusable procedure ODIN has learned. Phase 1: stored but not auto-invoked."""
+    """A reusable procedure ODIN has learned from a successful run."""
 
     id: str = Field(default_factory=_uid)
     name: str
     description: str
     steps: list[str] = Field(default_factory=list)
     preconditions: list[str] = Field(default_factory=list)
-    success_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    tools_used: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    success_count: int = 0
+    failure_count: int = 0
     usage_count: int = 0
+    avg_cost_tokens: float = 0.0
+    avg_latency_seconds: float = 0.0
+    retired: bool = False
     created_at: datetime = Field(default_factory=_now)
+    last_used: datetime = Field(default_factory=_now)
+
+    @property
+    def success_rate(self) -> float:
+        total = self.success_count + self.failure_count
+        return self.success_count / total if total else 0.0
 
 
 # ---------------------------------------------------------------------------
