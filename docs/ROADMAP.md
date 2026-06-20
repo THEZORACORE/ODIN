@@ -178,13 +178,23 @@ and is merged by a human — fully logged and reversible.
 
 > Goal: ODIN runs as a service, coordinating multiple agents on long-horizon goals.
 
-- [ ] **5.1** Durable, resumable jobs (checkpoint state; survive restarts).
-- [ ] **5.2** Agent-to-agent delegation across parallel sub-DAGs with shared MIMIR.
-- [ ] **5.3** Scheduler/daemon mode: queue goals, run on schedule, report.
+- [x] **5.1** Durable, resumable jobs (checkpoint state; survive restarts).
+  *Done:* `JobStore` (`odin/jobs/store.py`) — SQLite-backed persistence with priority queue,
+  lifecycle (queued → running → completed/failed/cancelled), and checkpoint blobs for resumability.
+- [x] **5.2** Agent-to-agent delegation across parallel sub-DAGs with shared MIMIR.
+  *Done:* `Delegator` (`odin/jobs/delegation.py`) — creates child jobs from `DelegationRequest`s,
+  tracks parent↔child relationships, checks completion across children for roll-up.
+- [x] **5.3** Scheduler/daemon mode: queue goals, run on schedule, report.
+  *Done:* `Scheduler` (`odin/jobs/scheduler.py`) — daemon loop pulls highest-priority queued jobs,
+  runs them through the orchestrator (shared MIMIR + SkillStore across jobs), marks completion.
+  CLI: `odin queue "<goal>"`, `odin daemon`, `odin jobs`, `odin cancel-job <id>`.
 - [ ] **5.4** Live research agents (web/RAG) feeding fresh, cited context into memory.
 - [ ] **5.5** Observability dashboard: plan DAGs, verdicts, budget, self-improvement history.
 
 **Exit criteria:** ODIN completes a multi-hour, multi-goal workload unattended, within budget, with full audit trail.
+
+> **Status:** 5.1, 5.2, and 5.3 implemented and tested (172 tests). Remaining: 5.4 live research
+> agents, 5.5 observability dashboard.
 
 ---
 

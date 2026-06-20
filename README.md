@@ -57,11 +57,15 @@ odin run "research Python async patterns, compute timing benchmarks, summarize w
 odin memories          # view stored memories
 odin skills            # list learned procedural skills
 odin skills-retire ID  # retire a bad skill so it stops being suggested
+odin queue "<goal>"    # add a goal to the job queue
+odin daemon            # run as a daemon, processing queued jobs
+odin jobs              # show job queue and history
+odin cancel-job ID     # cancel a queued job
 odin rsip-demo         # watch one self-improvement (RSIP) cycle, fully offline
 odin rsip-triggers     # show telemetry-derived improvement triggers (offline)
 odin rsip "<weakness>" # LIVE cycle: sandbox-test a candidate + open a real PR
 odin rollback          # safely revert the last self-improvement commit
-pytest tests/ -v       # run the test suite (150 tests)
+pytest tests/ -v       # run the test suite (172 tests)
 ```
 
 See [`odin/README.md`](odin/README.md) for the Phase 1 component docs and
@@ -82,9 +86,11 @@ See [`odin/README.md`](odin/README.md) for the Phase 1 component docs and
 - **Phase 2 hardening — done:** structured self-consistency (deterministic semantic similarity, no LLM
   judge call), budget-through-LLM (`TrackedLLM` meters every reasoning call), and DAG parallelism
   (independent plan nodes fan out via `asyncio.gather`).
-- **Next:** Phase 2.3/2.5/2.6 (container sandbox, ML injection detection, scalable backends),
-  Phase 5 (autonomy), Phases 7–12.
-- 150 tests, `ruff` + `mypy` clean.
+- **Phase 5 (autonomy) — done (5.1–5.3):** durable, resumable jobs ([`odin/jobs/`](odin/jobs/)),
+  agent-to-agent delegation with parent↔child tracking, and a scheduler/daemon mode that processes
+  queued goals continuously with shared memory and skills. `odin queue` / `odin daemon` / `odin jobs`.
+- **Next:** Phase 5.4–5.5 (live research agents, observability), Phase 2.3/2.5/2.6, Phases 7–12.
+- 172 tests, `ruff` + `mypy` clean.
 
 See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full step-by-step build, including the
 self-improvement subsystem and the GitHub integration design.
