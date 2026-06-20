@@ -55,11 +55,13 @@ export ANTHROPIC_API_KEY=your-key-here
 odin run "research Python async patterns, compute timing benchmarks, summarize with sources"
 
 odin memories          # view stored memories
+odin skills            # list learned procedural skills
+odin skills-retire ID  # retire a bad skill so it stops being suggested
 odin rsip-demo         # watch one self-improvement (RSIP) cycle, fully offline
 odin rsip-triggers     # show telemetry-derived improvement triggers (offline)
 odin rsip "<weakness>" # LIVE cycle: sandbox-test a candidate + open a real PR
 odin rollback          # safely revert the last self-improvement commit
-pytest tests/ -v       # run the test suite (126 tests)
+pytest tests/ -v       # run the test suite (147 tests)
 ```
 
 See [`odin/README.md`](odin/README.md) for the Phase 1 component docs and
@@ -73,10 +75,14 @@ See [`odin/README.md`](odin/README.md) for the Phase 1 component docs and
   self-modification caps (protected paths, diff-size cap, kill-switch). Now also telemetry-driven
   improvement triggers, sandboxed git-worktree isolation for candidate testing, and one-command
   rollback. Bounded, verified, human-gated — MUNINN opens a PR, a human merges.
+- **Phase 3 (skills) — done:** procedural memory ([`odin/skills/`](odin/skills/)). Successful runs are
+  auto-distilled into reusable `Skill`s stored in a SQLite-backed `SkillStore`; the planner retrieves
+  matching skills and reuses proven procedures. Failed runs produce reflection post-mortems.
+  Skill scoring (success rate, cost, latency) + retirement via `odin skills-retire`.
 - **Phase 2 hardening — done:** structured self-consistency (deterministic semantic similarity, no LLM
   judge call) and budget-through-LLM (`TrackedLLM` meters every reasoning call).
-- **Next:** Phase 2.3–2.6 (container sandbox, DAG parallelism), Phase 3 (skills), Phase 5 (autonomy).
-- 126 tests, `ruff` + `mypy` clean.
+- **Next:** Phase 2.3–2.6 (container sandbox, DAG parallelism), Phase 5 (autonomy), Phases 7–12.
+- 147 tests, `ruff` + `mypy` clean.
 
 See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full step-by-step build, including the
 self-improvement subsystem and the GitHub integration design.

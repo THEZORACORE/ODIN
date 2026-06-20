@@ -20,6 +20,7 @@ from odin.schemas import (
     NodeStatus,
     PlanDAG,
     PlanNode,
+    Skill,
 )
 
 _SYSTEM_PROMPT = """\
@@ -52,13 +53,32 @@ class OdinPlanner(BaseAgent):
             plan=plan.model_dump(mode="json"),
         )
 
-    async def create_plan(self, goal: str) -> PlanDAG:
-        """Generate a Plan-DAG for the given goal."""
+    async def create_plan(
+        self, goal: str, *, skill_hints: list[Skill] | None = None
+    ) -> PlanDAG:
+        """Generate a Plan-DAG for the given goal.
+
+        If *skill_hints* are provided (retrieved from the SkillStore), they are
+        injected into the prompt so the planner can reuse proven procedures
+        instead of re-deriving from scratch.
+        """
+        hint_block = ""
+        if skill_hints:
+            formatted = "\n".join(
+                f"- \"{s.name}\" (success {s.success_rate:.0%}, used {s.usage_count}x): "
+                + " -> ".join(s.steps)
+                for s in skill_hints
+            )
+            hint_block = (
+                "\n\nYou have previously solved similar goals. Reuse or adapt "
+                "these proven procedures if they fit:\n" + formatted + "\n"
+            )
+
         messages = [
             LLMMessage(role="system", content=self.system_prompt),
             LLMMessage(
                 role="user",
-                content=f"Decompose this goal into executable steps:\n\n{goal}",
+                content=f"Decompose this goal into executable steps:\n\n{goal}{hint_block}",
             ),
         ]
 

@@ -27,6 +27,9 @@ from odin.schemas import (
     VerdictRecord,
     VerifyOutcome,
 )
+from odin.skills.extraction import extract_skill
+from odin.skills.reflection import build_reflection
+from odin.skills.store import SkillStore
 from odin.tools.registry import ToolRegistry
 from odin.verify.verifier import Verifier, aggregate_verdicts
 
@@ -73,12 +76,14 @@ class Orchestrator:
         *,
         session_id: str = "default",
         budget: BudgetState | None = None,
+        skill_store: SkillStore | None = None,
     ) -> None:
         self._tools = tools
         self._heimdall = heimdall
         self._mimir = mimir
         self._session_id = session_id
         self._plan_revisions = 0
+        self._skill_store = skill_store
 
         if budget:
             self._heimdall.budget = budget
@@ -112,9 +117,14 @@ class Orchestrator:
         plan = PlanDAG(goal=goal)
 
         try:
-            # --- 1. PLAN ---
+            # --- 1. PLAN (with skill retrieval) ---
             logger.info("Phase: PLAN")
-            plan = await self._planner.create_plan(goal)
+            skill_hints = None
+            if self._skill_store is not None:
+                skill_hints = self._skill_store.find(goal) or None
+                if skill_hints:
+                    logger.info("Retrieved %d matching skills for planning", len(skill_hints))
+            plan = await self._planner.create_plan(goal, skill_hints=skill_hints)
             self._mimir.store_working("current_plan", plan.model_dump_json())
             logger.info("Plan created: %d nodes", len(plan.nodes))
 
@@ -143,9 +153,17 @@ class Orchestrator:
                     if not result:
                         break
 
-            # --- 6. REFLECT ---
+            # --- 6. REFLECT + SKILL EXTRACTION ---
             logger.info("Phase: REFLECT")
             await self._reflect(goal, plan, node_results, all_verdicts)
+
+            if plan.is_complete() and self._skill_store is not None:
+                skill = extract_skill(plan)
+                if skill is not None:
+                    self._skill_store.save(skill)
+                    logger.info("Extracted skill: %s", skill.name)
+            else:
+                self._store_reflection(plan, all_verdicts)
 
             # --- 7. CONSOLIDATE ---
             logger.info("Phase: CONSOLIDATE")
@@ -171,6 +189,7 @@ class Orchestrator:
 
         except BudgetExhausted as e:
             logger.warning("Budget exhausted: %s", e)
+            self._store_reflection(plan, all_verdicts)
             combined = "\n\n".join(
                 f"[Step: {nid}]\n{res}" for nid, res in node_results.items()
             )
@@ -318,6 +337,15 @@ class Orchestrator:
             tags=["orchestration_run", "reflection"],
             session_id=self._session_id,
         )
+
+    def _store_reflection(
+        self, plan: PlanDAG, verdicts: list[VerdictRecord]
+    ) -> None:
+        """Store a post-mortem for a failed/partial run."""
+        if plan.has_failed() or not plan.is_complete():
+            reflection = build_reflection(plan, verdicts, session_id=self._session_id)
+            self._mimir.store(reflection)
+            logger.info("Stored reflection memory for failed run")
 
     def _check_budget(self) -> None:
         if self._heimdall.budget.is_exhausted():
