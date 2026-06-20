@@ -68,7 +68,7 @@ odin rsip-demo         # watch one self-improvement (RSIP) cycle, fully offline
 odin rsip-triggers     # show telemetry-derived improvement triggers (offline)
 odin rsip "<weakness>" # LIVE cycle: sandbox-test a candidate + open a real PR
 odin rollback          # safely revert the last self-improvement commit
-pytest tests/ -v       # run the test suite (186 tests)
+pytest tests/ -v       # run the test suite (215 tests)
 ```
 
 See [`odin/README.md`](odin/README.md) for the Phase 1 component docs and
@@ -86,16 +86,17 @@ See [`odin/README.md`](odin/README.md) for the Phase 1 component docs and
   auto-distilled into reusable `Skill`s stored in a SQLite-backed `SkillStore`; the planner retrieves
   matching skills and reuses proven procedures. Failed runs produce reflection post-mortems.
   Skill scoring (success rate, cost, latency) + retirement via `odin skills-retire`.
-- **Phase 2 hardening — done:** structured self-consistency (deterministic semantic similarity, no LLM
-  judge call), budget-through-LLM (`TrackedLLM` meters every reasoning call), and DAG parallelism
-  (independent plan nodes fan out via `asyncio.gather`).
+- **Phase 2 hardening — done:** structured self-consistency, budget-through-LLM, DAG parallelism,
+  container sandbox ([`odin/tools/sandbox.py`](odin/tools/sandbox.py) — Process/Docker/Mock),
+  ML injection detection ([`odin/safety/injection.py`](odin/safety/injection.py) — TF-IDF classifier),
+  and pluggable backends ([`odin/memory/backends.py`](odin/memory/backends.py) — Neo4j graph + vector DB).
 - **Phase 5 (autonomy) — done:** durable, resumable jobs ([`odin/jobs/`](odin/jobs/)),
   agent-to-agent delegation with parent↔child tracking, scheduler/daemon mode,
   live research agents (HUGINN/MUNINN — [`odin/agents/research.py`](odin/agents/research.py)),
   and observability (HLIDSKJALF — [`odin/observe/`](odin/observe/)) with run history and stats.
   `odin queue` / `odin daemon` / `odin jobs` / `odin research` / `odin history` / `odin stats`.
-- **Next:** Phase 2.3/2.5/2.6 (container sandbox, ML injection detection, scalable backends), Phases 7–12.
-- 186 tests, `ruff` + `mypy` clean.
+- **Next:** Phases 7–12 (AGI-approaching layer: world model, multi-agent debate, formal guarantees).
+- 215 tests, `ruff` + `mypy` clean.
 
 See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full step-by-step build, including the
 self-improvement subsystem and the GitHub integration design.
