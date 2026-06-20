@@ -68,7 +68,7 @@ odin rsip-demo         # watch one self-improvement (RSIP) cycle, fully offline
 odin rsip-triggers     # show telemetry-derived improvement triggers (offline)
 odin rsip "<weakness>" # LIVE cycle: sandbox-test a candidate + open a real PR
 odin rollback          # safely revert the last self-improvement commit
-pytest tests/ -v       # run the test suite (186 tests)
+pytest tests/ -v       # run the test suite (204+ tests)
 ```
 
 See [`odin/README.md`](odin/README.md) for the Phase 1 component docs and
@@ -94,8 +94,14 @@ See [`odin/README.md`](odin/README.md) for the Phase 1 component docs and
   live research agents (HUGINN/MUNINN — [`odin/agents/research.py`](odin/agents/research.py)),
   and observability (HLIDSKJALF — [`odin/observe/`](odin/observe/)) with run history and stats.
   `odin queue` / `odin daemon` / `odin jobs` / `odin research` / `odin history` / `odin stats`.
-- **Next:** Phase 2.3/2.5/2.6 (container sandbox, ML injection detection, scalable backends), Phases 7–12.
-- 186 tests, `ruff` + `mypy` clean.
+- **Phase 2 hardening — done (full):** container sandbox, ML injection detection, pluggable backends.
+- **Phase 7 (world model) — done:** YGGDRASIL, NORNS causal engine, VÖLVA simulation.
+- **Phase 8 (multi-agent society) — done:** RATATOSKR message bus ([`odin/society/ratatoskr.py`](odin/society/ratatoskr.py)),
+  VÉ/VILI ensembles ([`odin/society/ensemble.py`](odin/society/ensemble.py)),
+  FORSETI debate ([`odin/society/debate.py`](odin/society/debate.py)),
+  DRAUPNIR+SLEIPNIR sub-agent pool ([`odin/society/agents.py`](odin/society/agents.py)).
+- **Next:** Phases 9–12.
+- 204+ tests, `ruff` + `mypy` clean.
 
 See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full step-by-step build, including the
 self-improvement subsystem and the GitHub integration design.

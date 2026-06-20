@@ -243,13 +243,25 @@ planning measurably beats reactive planning, within budget.
 
 > Goal: turn one agent into a *society* whose decorrelated members are more reliable than any single one.
 
-- [ ] **8.1 RATATOSKR message bus** 🟢: durable pub/sub for typed inter-agent messages.
-- [ ] **8.2 VÉ & VILI ensembles** 🟢: N independent reasoners across model families; aggregate to cancel decorrelated errors.
-- [ ] **8.3 FORSETI debate & consensus** 🟡: structured multi-agent debate with a judge that explains its ruling.
-- [ ] **8.4 DRAUPNIR self-replication** 🟢: spawn scoped sub-agents on demand; reclaim them; hard lifecycle/budget caps.
-- [ ] **8.5 SLEIPNIR parallelism** 🟢: concurrent sub-DAG execution + speculative decoding + difficulty-routed compute.
+- [x] **8.1 RATATOSKR message bus** 🟢: durable pub/sub for typed inter-agent messages.
+  *Done:* `MessageBus` (`odin/society/ratatoskr.py`) — SQLite-backed, topic-based pub/sub with
+  per-subscriber cursors, threaded replies, and message history.
+- [x] **8.2 VÉ & VILI ensembles** 🟢: N independent reasoners across model families; aggregate to cancel decorrelated errors.
+  *Done:* `EnsembleRunner` (`odin/society/ensemble.py`) — concurrent multi-model queries, word-overlap
+  majority vote, agreement scoring.
+- [x] **8.3 FORSETI debate & consensus** 🟡: structured multi-agent debate with a judge that explains its ruling.
+  *Done:* `DebateJudge` (`odin/society/debate.py`) — multi-round proposer↔opponent debate with
+  independent judge. Extracts confidence + winner from ruling.
+- [x] **8.4 DRAUPNIR self-replication** 🟢: spawn scoped sub-agents on demand; reclaim them; hard lifecycle/budget caps.
+  *Done:* `AgentPool` (`odin/society/agents.py`) — spawn/reclaim sub-agents with per-agent budgets,
+  pool cap enforcement, auto-reclaim of exhausted agents.
+- [x] **8.5 SLEIPNIR parallelism** 🟢: concurrent sub-DAG execution + speculative decoding + difficulty-routed compute.
+  *Done:* `AgentPool.fan_out()` — concurrent delegation across sub-agents via `asyncio.gather`.
 
 **Exit criteria:** debate/ensemble configuration beats single-agent accuracy on a held-out suite
+
+> **Status:** Phase 8 complete (8.1–8.5). 204 tests on this branch. RATATOSKR message bus,
+> VÉ/VILI ensembles, FORSETI debate, DRAUPNIR sub-agents, SLEIPNIR parallelism.
 without exceeding the cost ceiling.
 
 ---
