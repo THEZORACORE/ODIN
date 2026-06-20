@@ -12,11 +12,13 @@ Every tool call routes through Heimdall.gate() before execution.
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 
 from pydantic import BaseModel
 
+from odin.safety.injection import InjectionClassifier
 from odin.schemas import (
     ActionRisk,
     AgentRole,
@@ -25,6 +27,8 @@ from odin.schemas import (
     ToolRequest,
     ToolResult,
 )
+
+logger = logging.getLogger("odin.safety.heimdall")
 
 # ---------------------------------------------------------------------------
 # Capability matrix — which agents can use which tools at which risk
@@ -153,12 +157,16 @@ class Heimdall:
         auto_approve_up_to: ActionRisk = ActionRisk.MEDIUM,
         capabilities: dict[AgentRole, dict[str, ActionRisk]] | None = None,
         self_mod_policy: SelfModificationPolicy | None = None,
+        use_ml_injection: bool = True,
     ) -> None:
         self.budget = budget or BudgetState()
         self._auto_approve_up_to = auto_approve_up_to
         self._capabilities = capabilities or _AGENT_CAPABILITIES
         self.self_mod_policy = self_mod_policy or SelfModificationPolicy()
         self._audit_log: list[dict[str, Any]] = []
+        self._ml_classifier: InjectionClassifier | None = None
+        if use_ml_injection:
+            self._ml_classifier = InjectionClassifier()
 
     # -- Public API --
 
@@ -293,6 +301,12 @@ class Heimdall:
                 self._check_injection(value)
 
     def _check_injection(self, content: str) -> None:
+        # Phase 2.5: ML classifier first, then regex fallback
+        if self._ml_classifier is not None and self._ml_classifier.is_injection(content):
+            score = self._ml_classifier.score(content)
+            self._log("injection_blocked_ml", None, detail=f"ML score={score:.3f}")
+            raise InjectionDetected(f"ML classifier (score={score:.3f})", content[:200])
+
         for pattern in _INJECTION_PATTERNS:
             match = pattern.search(content)
             if match:

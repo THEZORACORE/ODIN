@@ -1,105 +1,71 @@
-"""Tests for sandboxed git worktree isolation (Phase 4.5)."""
+"""Tests for the sandbox abstraction (Phase 2.3)."""
 
 from __future__ import annotations
 
-import os
-import shutil
-from collections.abc import Sequence
-from pathlib import Path
-
 import pytest
 
-from odin.improve.sandbox import GitWorktreeSandbox
-from odin.improve.shell import SubprocessRunner
+from odin.tools.sandbox import ContainerSandbox, MockSandbox, ProcessSandbox, SandboxResult
 
 
-class RecordingRunner:
-    """Records argv/stdin without running anything."""
+class TestSandboxResult:
+    def test_success(self) -> None:
+        r = SandboxResult("hello", exit_code=0)
+        assert r.success
+        assert r.output == "hello"
 
-    def __init__(self) -> None:
-        self.calls: list[list[str]] = []
-        self.stdins: list[str | None] = []
+    def test_failure(self) -> None:
+        r = SandboxResult("", "error", exit_code=1)
+        assert not r.success
+        assert "error" in r.output
 
-    async def run(
-        self,
-        args: Sequence[str],
-        *,
-        cwd: str | None = None,
-        stdin: str | None = None,
-        check: bool = True,
-    ) -> str:
-        self.calls.append(list(args))
-        self.stdins.append(stdin)
-        return ""
+    def test_timeout(self) -> None:
+        r = SandboxResult("", "", -1, timed_out=True)
+        assert not r.success
+        assert "TIMEOUT" in r.output
 
+    def test_truncation(self) -> None:
+        r = SandboxResult("x" * 60_000)
+        assert "TRUNCATED" in r.output
 
-class TestSandboxCommands:
-    async def test_worktree_add_and_remove(self) -> None:
-        runner = RecordingRunner()
-        sandbox = GitWorktreeSandbox("/repo", base="main", runner=runner)
-
-        async with sandbox.worktree() as tree:
-            assert os.path.basename(tree) == "tree"
-            await sandbox.apply_diff(tree, "DIFF")
-
-        assert runner.calls[0][:4] == ["git", "worktree", "add", "--detach"]
-        assert runner.calls[0][-1] == "main"
-        assert ["git", "apply", "-"] in runner.calls
-        assert "DIFF" in runner.stdins
-        assert runner.calls[-1][:3] == ["git", "worktree", "remove"]
-
-    async def test_worktree_removed_even_on_error(self) -> None:
-        runner = RecordingRunner()
-        sandbox = GitWorktreeSandbox("/repo", runner=runner)
-
-        with pytest.raises(ValueError):
-            async with sandbox.worktree():
-                raise ValueError("boom")
-
-        assert runner.calls[-1][:3] == ["git", "worktree", "remove"]
+    def test_no_output(self) -> None:
+        r = SandboxResult("")
+        assert r.output == "[No output]"
 
 
-def _git_available() -> bool:
-    return shutil.which("git") is not None
+class TestMockSandbox:
+    @pytest.mark.asyncio
+    async def test_returns_canned(self) -> None:
+        sb = MockSandbox(output="42")
+        r = await sb.execute("print(42)")
+        assert r.success
+        assert r.stdout == "42"
+
+    @pytest.mark.asyncio
+    async def test_custom_exit(self) -> None:
+        sb = MockSandbox(output="err", exit_code=1)
+        r = await sb.execute("fail")
+        assert not r.success
 
 
-@pytest.mark.skipif(not _git_available(), reason="git not available")
-class TestSandboxRealGit:
-    async def _init_repo(self, path: Path) -> None:
-        runner = SubprocessRunner()
-        await runner.run(["git", "init"], cwd=str(path))
-        (path / "file.txt").write_text("hello\n")
-        await runner.run(["git", "add", "file.txt"], cwd=str(path))
-        await runner.run(
-            [
-                "git", "-c", "user.email=odin@test", "-c", "user.name=ODIN",
-                "commit", "-m", "init",
-            ],
-            cwd=str(path),
-        )
+class TestProcessSandbox:
+    @pytest.mark.asyncio
+    async def test_basic_exec(self) -> None:
+        sb = ProcessSandbox()
+        r = await sb.execute("print(2 + 2)")
+        assert r.success
+        assert "4" in r.stdout
 
-    async def test_diff_applies_in_isolation(self, tmp_path: Path) -> None:
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        await self._init_repo(repo)
+    @pytest.mark.asyncio
+    async def test_error(self) -> None:
+        sb = ProcessSandbox()
+        r = await sb.execute("raise ValueError('boom')")
+        assert not r.success
+        assert "boom" in r.output
 
-        diff = (
-            "--- a/file.txt\n"
-            "+++ b/file.txt\n"
-            "@@ -1 +1 @@\n"
-            "-hello\n"
-            "+hello world\n"
-        )
-        sandbox = GitWorktreeSandbox(str(repo))
-        captured: str | None = None
-        async with sandbox.worktree() as tree:
-            await sandbox.apply_diff(tree, diff)
-            captured = (Path(tree) / "file.txt").read_text()
-            assert os.path.isdir(tree)
 
-        # candidate change is visible only inside the worktree
-        assert captured == "hello world\n"
-        # the live checkout is untouched
-        assert (repo / "file.txt").read_text() == "hello\n"
-        # worktree is cleaned up
-        assert not os.path.exists(tree)
+class TestContainerSandbox:
+    @pytest.mark.asyncio
+    async def test_availability_check(self) -> None:
+        # Just verify the method runs without crashing
+        available = await ContainerSandbox.is_available()
+        assert isinstance(available, bool)

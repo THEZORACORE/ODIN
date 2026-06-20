@@ -81,18 +81,25 @@ enforced budget, and a verdict trail.
   `record_llm_call()` → real token/cost caps instead of wall-clock approximation.
   *Done:* `TrackedLLM` (`odin/routing/llm_adapter.py`) wraps the orchestrator's adapter; all agents
   share it, so every reasoning call counts and `BudgetExhausted` fires on a cap. (Open: MIMIR embeddings.)
-- [ ] **2.3 Container sandbox** for code execution (replace `preexec_fn` rlimits) → safe parallel exec.
+- [x] **2.3 Container sandbox** for code execution (replace `preexec_fn` rlimits) → safe parallel exec.
+  *Done:* `Sandbox` protocol + `ProcessSandbox` (default, subprocess), `ContainerSandbox` (Docker-based: network=none,
+  read-only, memory/CPU caps), `MockSandbox` (tests). See `odin/tools/sandbox.py`.
 - [x] **2.4 DAG parallelism**: execute independent `PlanNode`s concurrently (the DAG already encodes deps).
   *Done:* the orchestrator scheduling loop fans out all ready (dependency-free) nodes via
   `asyncio.gather`; plan revision is serialised under an `asyncio.Lock` so concurrent failures
   don't corrupt the plan.
-- [ ] **2.5 ML-based injection detection** to replace hardcoded regex patterns.
-- [ ] **2.6 Scalable backends**: optional Neo4j semantic graph; pluggable vector DB.
+- [x] **2.5 ML-based injection detection** to replace hardcoded regex patterns.
+  *Done:* `InjectionClassifier` (`odin/safety/injection.py`) — TF-IDF + cosine-similarity classifier trained on
+  labeled injection/benign corpus. Integrated into HEIMDALL: ML classifier runs first, regex fallback second.
+- [x] **2.6 Scalable backends**: optional Neo4j semantic graph; pluggable vector DB.
+  *Done:* `GraphBackend` (abstract) with `NetworkXGraphBackend` (default) + `Neo4jGraphBackend` (production);
+  `VectorBackend` (abstract) with `ChromaVectorBackend` (default) + `InMemoryVectorBackend` (lightweight/test).
+  See `odin/memory/backends.py`.
 
 **Exit criteria:** parallel DAG execution, real cost accounting, container isolation, ≥90% test coverage.
 
-> **Status:** 2.1, 2.2, and 2.4 implemented and tested (150 tests). Remaining: 2.3 container
-> sandbox, 2.5 ML injection detection, 2.6 scalable backends.
+> **Status:** Phase 2 complete (2.1–2.6). 215 tests. Structured verification, budget-through-LLM,
+> container sandbox, DAG parallelism, ML injection detection, and pluggable backends.
 
 ---
 
