@@ -1,4 +1,4 @@
-import { PicksResponse } from "@/types";
+import { LatestDateResponse, PicksResponse } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -9,6 +9,15 @@ export interface PicksRequest {
   min_confidence: number;
   max_picks: number;
   bankroll: number;
+}
+
+export async function fetchLatestDate(): Promise<LatestDateResponse> {
+  const res = await fetch(`${API_BASE}/picks/latest-date/`);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Request failed: ${res.status}`);
+  }
+  return res.json();
 }
 
 export async function fetchPicks(req: PicksRequest): Promise<PicksResponse> {

@@ -20,6 +20,18 @@ def _split_prefix(col: str) -> tuple[str, str]:
     return ("", col)
 
 
+def _format_feature_name(base_name: str) -> str:
+    """Turn a base feature name like 'pts_avg20' into a readable label."""
+    # Split on '_avg' or '_std' to separate the metric and the window.
+    for sep in ("_avg", "_std"):
+        if sep in base_name:
+            metric, window = base_name.rsplit(sep, 1)
+            metric = metric.replace("_", " ")
+            kind = "rolling" if sep == "_avg" else "volatility"
+            return f"{metric} ({kind}-{window})"
+    return base_name.replace("_", " ")
+
+
 def build_direction_map(
     data: pl.DataFrame,
     feature_cols: list[str],
@@ -103,7 +115,7 @@ def top_key_factors(
 
         drivers.append(
             {
-                "feature": base_name.replace("_", " ").replace("avg", " rolling ").strip(),
+                "feature": _format_feature_name(base_name),
                 "value": round(abs(float(diff_for_home)), 4),
                 "direction": "up" if effective > 0 else "down",
             }

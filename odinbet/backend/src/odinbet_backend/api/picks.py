@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 class PickRequest(BaseModel):
     sport: str = Field(default="nba", description="Sport/league key")
     game_date: date = Field(default_factory=date.today)
-    min_ev: float = Field(default=0.02, ge=-0.5, le=1.0)
+    min_ev: float = Field(default=0.0, ge=-0.5, le=1.0)
     min_confidence: float = Field(default=0.55, ge=0.0, le=1.0)
     max_picks: int = Field(default=20, ge=1, le=100)
     bankroll: float = Field(default=1000.0, gt=0)
@@ -43,6 +43,11 @@ class PickResponse(BaseModel):
     bankroll: float
     picks: list[Pick]
     warning: str | None = None
+
+
+class LatestDateResponse(BaseModel):
+    latest_date: str | None
+    total_games: int
 
 
 router = APIRouter()
@@ -92,3 +97,33 @@ async def get_picks(req: PickRequest, request: Request) -> PickResponse:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/latest-date", response_model=LatestDateResponse)
+async def get_latest_date(request: Request) -> LatestDateResponse:
+    """Return the most recent date with a meaningful slate of games."""
+    state = request.app.state
+    if not getattr(state, "data_ready", False):
+        raise HTTPException(status_code=503, detail="Service is still loading data.")
+
+    data: pl.DataFrame = state.training_data
+    if len(data) == 0:
+        return LatestDateResponse(latest_date=None, total_games=0)
+
+    # Pick the latest date that has at least 10 games (avoids off-season exhibitions).
+    counts = data.group_by("game_date").agg(pl.len().alias("count")).sort(
+        "game_date", descending=True
+    )
+    for row in counts.iter_rows(named=True):
+        if row["count"] >= 10:
+            return LatestDateResponse(
+                latest_date=str(row["game_date"]),
+                total_games=row["count"],
+            )
+
+    # Fallback to the absolute latest date if no date has enough games.
+    latest = data["game_date"].max()
+    if latest is None:
+        return LatestDateResponse(latest_date=None, total_games=0)
+    total = len(data.filter(pl.col("game_date") == latest))
+    return LatestDateResponse(latest_date=str(latest), total_games=total)

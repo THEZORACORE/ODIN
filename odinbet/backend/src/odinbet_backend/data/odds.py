@@ -12,6 +12,7 @@ import polars as pl
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
 from ..config import settings
 
@@ -39,7 +40,8 @@ class BaselineOddsProvider(OddsProvider):
         model = Pipeline(
             [
                 ("imputer", SimpleImputer(strategy="median")),
-                ("logreg", LogisticRegression(max_iter=1000, C=1.0, class_weight="balanced")),
+                ("scaler", StandardScaler()),
+                ("logreg", LogisticRegression(max_iter=5000, C=1.0, class_weight="balanced")),
             ]
         )
         model.fit(X, y)

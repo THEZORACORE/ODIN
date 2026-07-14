@@ -26,3 +26,8 @@ export interface PicksResponse {
   picks: Pick[];
   warning: string | null;
 }
+
+export interface LatestDateResponse {
+  latest_date: string | null;
+  total_games: number;
+}

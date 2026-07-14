@@ -1,25 +1,36 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { fetchPicks, PicksRequest } from "@/lib/api";
+import { useEffect, useMemo, useState } from "react";
+import { fetchLatestDate, fetchPicks, PicksRequest } from "@/lib/api";
 import { PicksResponse } from "@/types";
 import PickCard from "./PickCard";
-
-const latestDateInDataset = "2026-04-12";
 
 export default function Dashboard() {
   const [req, setReq] = useState<PicksRequest>({
     sport: "nba",
-    game_date: latestDateInDataset,
-    min_ev: 0.02,
-    min_confidence: 0.55,
+    game_date: "",
+    min_ev: 0.0,
+    min_confidence: 0.5,
     max_picks: 20,
     bankroll: 1000,
   });
 
   const [data, setData] = useState<PicksResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [dateLoading, setDateLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchLatestDate()
+      .then((res) => {
+        const latest = res.latest_date;
+        if (latest) {
+          setReq((prev) => ({ ...prev, game_date: latest }));
+        }
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setDateLoading(false));
+  }, []);
 
   const totalUnits = useMemo(
     () => (data?.picks ?? []).reduce((sum, p) => sum + p.recommended_units, 0),
@@ -126,7 +137,7 @@ export default function Dashboard() {
         <div className="flex items-end">
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || dateLoading || !req.game_date}
             className="w-full rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
           >
             {loading ? "Loading..." : "Get Picks"}
