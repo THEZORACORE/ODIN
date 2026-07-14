@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "data"
@@ -12,6 +12,8 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 class Settings(BaseSettings):
     """Environment-derived settings."""
 
+    model_config = SettingsConfigDict(env_prefix="ODINBET_", env_file=".env")
+
     app_name: str = "ODINBET"
     debug: bool = False
     host: str = "0.0.0.0"
@@ -20,10 +22,6 @@ class Settings(BaseSettings):
     model_dir: Path = DATA_DIR / "models"
     odds_api_key: str | None = None
     log_level: str = "INFO"
-
-    class Config:
-        env_prefix = "ODINBET_"
-        env_file = ".env"
 
 
 settings = Settings()

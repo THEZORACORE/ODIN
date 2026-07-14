@@ -140,6 +140,37 @@ def _build_team_log(df: pl.DataFrame) -> pl.DataFrame:
     return df
 
 
+def _build_elo_ratings(
+    df: pl.DataFrame,
+    initial: float = 1500.0,
+    k: float = 20.0,
+    home_advantage: float = 100.0,
+) -> pl.DataFrame:
+    """Compute simple Elo ratings for each team before every game."""
+    games = build_game_records(df).sort("game_date", "game_id")
+    ratings: dict[int, float] = {}
+    rows: list[dict] = []
+    for row in games.iter_rows(named=True):
+        home_id = int(row["home_team_id"])
+        away_id = int(row["away_team_id"])
+        home_elo = ratings.get(home_id, initial)
+        away_elo = ratings.get(away_id, initial)
+        expected_home = 1.0 / (
+            1.0 + 10 ** ((away_elo - (home_elo + home_advantage)) / 400.0)
+        )
+        result = float(row["home_win"])
+        home_delta = k * (result - expected_home)
+        rows.append({"team_id": home_id, "game_id": row["game_id"], "elo": home_elo})
+        rows.append({"team_id": away_id, "game_id": row["game_id"], "elo": away_elo})
+        ratings[home_id] = home_elo + home_delta
+        ratings[away_id] = away_elo - home_delta
+    elo_df = pl.DataFrame(rows)
+    return elo_df.with_columns(
+        pl.col("team_id").cast(pl.Int64),
+        pl.col("elo").cast(pl.Float64),
+    )
+
+
 def build_team_features(df: pl.DataFrame, windows: Iterable[int] = WINDOWS) -> pl.DataFrame:
     """Compute lagged rolling averages per team and per game.
 
@@ -148,6 +179,8 @@ def build_team_features(df: pl.DataFrame, windows: Iterable[int] = WINDOWS) -> p
     columns are intentionally dropped to avoid target leakage.
     """
     df = _build_team_log(df)
+    elo_df = _build_elo_ratings(df)
+    df = df.join(elo_df, on=["team_id", "game_id"], how="left")
 
     exprs: list[pl.Expr] = []
     rolling_cols: list[str] = []
@@ -171,7 +204,9 @@ def build_team_features(df: pl.DataFrame, windows: Iterable[int] = WINDOWS) -> p
     rolling_cols.append("pts_std10")
 
     df = df.with_columns(exprs)
-    return df.select(["team_id", "game_id", "game_date", "season_year", "days_rest", *rolling_cols])
+    return df.select(
+        ["team_id", "game_id", "game_date", "season_year", "days_rest", "elo", *rolling_cols]
+    )
 
 
 def build_training_data(
