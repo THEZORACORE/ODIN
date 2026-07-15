@@ -53,7 +53,7 @@ async def get_backtest(request: Request) -> BacktestResponse:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@router.get("/metrics", response_model=MetricsResponse)
+@router.get("/metrics/", response_model=MetricsResponse)
 async def get_metrics(request: Request) -> MetricsResponse:
     """Return the last trained model's test metrics and top features."""
     state = request.app.state

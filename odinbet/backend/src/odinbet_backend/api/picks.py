@@ -99,7 +99,7 @@ async def get_picks(req: PickRequest, request: Request) -> PickResponse:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@router.get("/latest-date", response_model=LatestDateResponse)
+@router.get("/latest-date/", response_model=LatestDateResponse)
 async def get_latest_date(request: Request) -> LatestDateResponse:
     """Return the most recent date with a meaningful slate of games."""
     state = request.app.state
