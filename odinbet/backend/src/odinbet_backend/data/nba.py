@@ -237,6 +237,12 @@ def build_training_data(
         on=["game_id", "game_date", "season_year", "away_team_id"],
         how="inner",
     )
+    # Add explicit difference features; these help the baseline odds provider and
+    # give the XGBoost model a strong, interpretable signal.
+    data = data.with_columns(
+        (pl.col("home_elo") - pl.col("away_elo")).alias("elo_diff"),
+        (pl.col("home_days_rest") - pl.col("away_days_rest")).alias("rest_diff"),
+    )
     return data
 
 
