@@ -13,6 +13,7 @@ def _required_data_exists() -> bool:
     return (
         Path(settings.data_dir / "gamelogs.parquet").exists()
         and Path(settings.model_dir / "model_v1.pkl").exists()
+        and Path(settings.model_dir / "baseline_odds.pkl").exists()
     )
 
 
