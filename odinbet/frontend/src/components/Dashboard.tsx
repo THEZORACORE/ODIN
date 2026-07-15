@@ -1,8 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { fetchLatestDate, fetchPicks, PicksRequest } from "@/lib/api";
-import { PicksResponse } from "@/types";
+import {
+  fetchBacktest,
+  fetchLatestDate,
+  fetchMetrics,
+  fetchPicks,
+  PicksRequest,
+} from "@/lib/api";
+import { BacktestResponse, MetricsResponse, PicksResponse } from "@/types";
 import PickCard from "./PickCard";
 
 export default function Dashboard() {
@@ -16,6 +22,8 @@ export default function Dashboard() {
   });
 
   const [data, setData] = useState<PicksResponse | null>(null);
+  const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
+  const [backtest, setBacktest] = useState<BacktestResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [dateLoading, setDateLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +38,14 @@ export default function Dashboard() {
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setDateLoading(false));
+
+    fetchMetrics()
+      .then(setMetrics)
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+
+    fetchBacktest()
+      .then(setBacktest)
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
 
   const totalUnits = useMemo(
@@ -69,6 +85,70 @@ export default function Dashboard() {
         For entertainment and research only. Picks are not financial advice. Set limits,
         never bet more than you can afford to lose.
       </div>
+
+      {(metrics || backtest) && (
+        <details className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <summary className="cursor-pointer text-sm font-semibold text-slate-900">
+            Model performance
+          </summary>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {metrics && (
+              <>
+                <div>
+                  <p className="text-xs text-slate-500">ROC-AUC</p>
+                  <p className="text-lg font-semibold text-slate-900">
+                    {(metrics.metrics.roc_auc * 100).toFixed(1)}%
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Accuracy</p>
+                  <p className="text-lg font-semibold text-slate-900">
+                    {(metrics.metrics.accuracy * 100).toFixed(1)}%
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Brier score</p>
+                  <p className="text-lg font-semibold text-slate-900">
+                    {metrics.metrics.brier_score.toFixed(3)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Log loss</p>
+                  <p className="text-lg font-semibold text-slate-900">
+                    {metrics.metrics.log_loss.toFixed(3)}
+                  </p>
+                </div>
+              </>
+            )}
+            {backtest && (
+              <>
+                <div>
+                  <p className="text-xs text-slate-500">Backtest yield (ROI)</p>
+                  <p className="text-lg font-semibold text-slate-900">
+                    {(backtest.roi * 100).toFixed(2)}%
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Backtest profit</p>
+                  <p className="text-lg font-semibold text-slate-900">
+                    {backtest.profit.toFixed(0)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Win / loss</p>
+                  <p className="text-lg font-semibold text-slate-900">
+                    {backtest.wins} / {backtest.losses}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Test games</p>
+                  <p className="text-lg font-semibold text-slate-900">{backtest.n_games}</p>
+                </div>
+              </>
+            )}
+          </div>
+        </details>
+      )}
 
       <form
         onSubmit={handleSubmit}

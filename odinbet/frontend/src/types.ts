@@ -31,3 +31,20 @@ export interface LatestDateResponse {
   latest_date: string | null;
   total_games: number;
 }
+
+export interface MetricsResponse {
+  metrics: Record<string, number>;
+  top_features: { feature: string; importance: number }[];
+}
+
+export interface BacktestResponse {
+  n_games: number;
+  roi: number;
+  profit: number;
+  wagered: number;
+  final_bankroll: number;
+  bankroll_return: number;
+  wins: number;
+  losses: number;
+  pushes: number;
+}

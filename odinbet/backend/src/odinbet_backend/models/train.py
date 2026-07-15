@@ -35,31 +35,25 @@ def expected_calibration_error(y_true: np.ndarray, y_prob: np.ndarray, n_bins: i
     return ece / len(y_true)
 
 
-def chronological_split(
+def chronological_data_split(
     data: pl.DataFrame,
-    feature_cols: list[str],
-    target_col: str = "home_win",
     train_frac: float = 0.6,
     calibration_frac: float = 0.2,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Split data chronologically into train / calibration / test sets."""
-    data = data.sort("game_date")
+) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
+    """Return chronological train / calibration / test DataFrames."""
+    data = data.sort("game_date", "game_id")
     n = len(data)
     train_end = int(n * train_frac)
     calib_end = int(n * (train_frac + calibration_frac))
+    return data[:train_end], data[train_end:calib_end], data[calib_end:]
 
-    train = data[:train_end]
-    calib = data[train_end:calib_end]
-    test = data[calib_end:]
 
-    X_train = train.select(feature_cols).to_numpy()
-    y_train = train[target_col].to_numpy().ravel()
-    X_calib = calib.select(feature_cols).to_numpy()
-    y_calib = calib[target_col].to_numpy().ravel()
-    X_test = test.select(feature_cols).to_numpy()
-    y_test = test[target_col].to_numpy().ravel()
-
-    return X_train, y_train, X_calib, y_calib, X_test, y_test
+def _arrays_from_frame(
+    data: pl.DataFrame, feature_cols: list[str], target_col: str
+) -> tuple[np.ndarray, np.ndarray]:
+    X = data.select(feature_cols).to_numpy()
+    y = data[target_col].to_numpy().ravel()
+    return X, y
 
 
 def train_model(
@@ -67,15 +61,21 @@ def train_model(
     feature_cols: list[str],
     target_col: str = "home_win",
     model_dir: Path | None = None,
+    split: tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame] | None = None,
 ) -> dict[str, Any]:
     """Train an XGBoost classifier, calibrate it, and persist artifacts."""
     if model_dir is None:
         model_dir = settings.model_dir
     model_dir.mkdir(parents=True, exist_ok=True)
 
-    X_train, y_train, X_calib, y_calib, X_test, y_test = chronological_split(
-        data, feature_cols, target_col
-    )
+    if split is None:
+        train_df, calib_df, test_df = chronological_data_split(data)
+    else:
+        train_df, calib_df, test_df = split
+
+    X_train, y_train = _arrays_from_frame(train_df, feature_cols, target_col)
+    X_calib, y_calib = _arrays_from_frame(calib_df, feature_cols, target_col)
+    X_test, y_test = _arrays_from_frame(test_df, feature_cols, target_col)
 
     imputer = SimpleImputer(strategy="median")
     X_train = imputer.fit_transform(X_train)
@@ -126,7 +126,7 @@ def train_model(
         if base.feature_importances_[i] > 0
     }
 
-    direction_map = build_direction_map(data, feature_cols)
+    direction_map = build_direction_map(train_df, feature_cols)
 
     artifacts = {
         "model": calibrated,

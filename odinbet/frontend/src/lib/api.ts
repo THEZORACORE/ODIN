@@ -1,4 +1,9 @@
-import { LatestDateResponse, PicksResponse } from "@/types";
+import {
+  BacktestResponse,
+  LatestDateResponse,
+  MetricsResponse,
+  PicksResponse,
+} from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -26,6 +31,24 @@ export async function fetchPicks(req: PicksRequest): Promise<PicksResponse> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
   });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Request failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function fetchMetrics(): Promise<MetricsResponse> {
+  const res = await fetch(`${API_BASE}/backtest/metrics/`);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Request failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function fetchBacktest(): Promise<BacktestResponse> {
+  const res = await fetch(`${API_BASE}/backtest/`);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(text || `Request failed: ${res.status}`);

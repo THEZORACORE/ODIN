@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import health, picks
+from .api import backtest, health, picks
 from .config import settings
 from .data.nba import build_training_data, get_feature_columns, load_raw_games
 from .data.odds import BaselineOddsProvider
@@ -49,3 +49,4 @@ app.add_middleware(
 
 app.include_router(health.router, prefix="/health", tags=["health"])
 app.include_router(picks.router, prefix="/picks", tags=["picks"])
+app.include_router(backtest.router, prefix="/backtest", tags=["backtest"])
